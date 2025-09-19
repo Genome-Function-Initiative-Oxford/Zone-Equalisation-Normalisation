@@ -1,6 +1,6 @@
 # Zone Equalisation Normalisation
 
-TBC
+ZEN-norm is a Python package for normalising bigWigs and evaluating performance. Modules normalisation of bigWigs with ZEN (ZoneNorm), reverse normalisation (ReverseNorm) and normalisation comparision (NormCompare).
 
 <br>
 
@@ -31,6 +31,7 @@ znorm.predictSignalZones()
 znorm.normaliseSignal()
 ```
 
-## Evaluation Normalisation Methods
+## Evaluating Normalisation Methods
 
 ## Reversing Prior Normalisation
+Sometimes it is not possible or convenient to obtain bigWigs without prior normalisation. For example, if using published data that only provides bigWigs after RPKM normalisation. However, double normalisation will occur if pre-normalised bigWigs are used directly in ZoneNorm. To avoid this, it is best to first reverse normalise pre-normalised bigWigs using ReverseNorm to obtain raw bigWigs.
