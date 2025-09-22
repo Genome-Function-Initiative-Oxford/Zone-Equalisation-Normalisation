@@ -72,6 +72,25 @@ znorm.normaliseSignal()
 ## Evaluating Normalisation Methods
 
 ### Initialisation
+
+| Norm    | Sample | bigWig |
+| -------- | ------- | ------- |
+| RPKM | Cell_Type_A | path/to/bams/cell_type_A_RPKM.bw |
+| RPKM | Cell_Type_B | path/to/bams/cell_type_B_RPKM.bw |
+| ZEN | Cell_Type_A | path/to/bams/cell_type_A_ZEN.bw |
+| ZEN | Cell_Type_B | path/to/bams/cell_type_B_ZEN.bw |
+| ... | ... | ... |
+
+
+```python
+bw_df = pd.DataFrame({"norm": np.array([[m] * len(sample_names) for m in norm_methods]).flatten(), 
+                      "sample": np.tile(sample_names, len(norm_methods)),
+                      "bigwig": bigwig_files})
+
+peak_df = pd.DataFrame({"sample": sample_names,
+                        "peaks": peak_files})
+```
+
 ```python
 from ZEN_norm.norm_compare import NormCompare
 
