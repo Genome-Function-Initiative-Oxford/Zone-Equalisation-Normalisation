@@ -53,4 +53,9 @@ Sometimes it is not possible or convenient to obtain bigWigs without prior norma
 
 ```python
 from ZEN_norm.reverse_norm import ReverseNorm
+
+rev = ReverseBigWigNorm(analysis_name = "Analysis", # Set custom output folder name
+                        bigwig_paths = inputs, # Specify a list of bigWig paths
+                        n_cores = 1) # Set number of cores to use
+rev.reverseNorm(chunk_size = 10000000, chromosomes = ["chr22"])
 ```
