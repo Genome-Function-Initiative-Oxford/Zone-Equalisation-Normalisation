@@ -23,6 +23,21 @@ conda env create --name zen_env --file=zen_environment.yml
 ```
 
 ## Normalisation With ZEN
+The module `ZoneNorm` is designed for normalising genomic coverage with ZEN. Steps include: ...
+
+### Specifying Input BAMs or BigWigs
+
+
+```python
+bam_paths = ["path/to/bams/cell_type_A.bam", "path/to/bams/cell_type_B.bam"]
+```
+
+```python
+bigwig_paths = ["path/to/bams/cell_type_A.bw", "path/to/bams/cell_type_B.bw"]
+```
+
+### Initialisation of ZoneNorm Object
+
 
 ```python
 from ZEN_norm.zone_norm import ZoneNorm
@@ -32,20 +47,54 @@ znorm = ZoneNorm(analysis_name = "Analysis_Name",
                  bigwig_paths = input_paths,
                  n_cores = n_cores,
                  norm_method = "ZEN")
+```
 
+```python
 # Open each bigWig and extract signal to arrays
 znorm.readBigWigSignals()
+```
+
+```python
 # Fit distributions for signal zone prediction
 znorm.testDistributions()
+```
+
+```python
 # Use distribution to predict signal zone coordinates
 znorm.predictSignalZones()
+```
+
+```python
 # Create normalised bigWigs
 znorm.normaliseSignal()
 ```
 
 ## Evaluating Normalisation Methods
+
+### Initialisation
 ```python
 from ZEN_norm.norm_compare import NormCompare
+
+norm_compare = NormCompare(bigwig_df = bw_df,
+                           peaks_df = peak_df,
+                           min_peak_score = 0.5,
+                           min_consensus = 1,
+                           n_cores = znorm.n_cores,
+                           analysis_name = = "Analysis_Name",
+                           verbose = 2)
+```
+
+### Creating Wasserstein Plots
+```python
+norm_compare.plotWasserstein(chromosomes = [], plot_samples = [], norm_methods = [], use_chrom_maxs = False,
+                             reference_norm = "ZEN", log_scale = False, pdf_name = "TTseq_Gumbell")
+```
+
+### Creating MA Plots
+```python
+norm_compare.MAPlot(norm_method, plot_samples = [], chromosomes = [], n_cols = 4,
+               point_transparency = 0.3, point_colour = "grey", title = "", plot_width = 8, plot_height = 6,
+               pdf_name = ""):
 ```
 
 ## Reversing Prior Normalisation
