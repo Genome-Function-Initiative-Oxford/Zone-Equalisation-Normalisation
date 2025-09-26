@@ -9,26 +9,14 @@ ZEN-norm is a Python package for normalising bigWigs by Zone Equilisation Normal
 ## Installation
 
 ### PyPI
-To install ZEN-norm, pyBigWig must first be installed to avoid errors.
-
-```
-pip install pyBigWig
-```
-
-Then run the command below to install the ZEN-norm package from PyPI.
+To install the ZEN-norm package from PyPI, run the command below:
 
 ```
 python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple ZEN-norm-test
 ```
 
-```
-python -m pip install --no-cache-dir --prefer-binary --only-binary=pybigwig \
-  --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple \
-  ZEN-norm-test
-```
-
 ### (Optional) Conda Enviroment
-If there are issues installing ZEN-norm, a conda environment with the relavant packages can be created using the YAML enviroment file.
+If there are issues installing ZEN-norm, a conda environment with the relevant packages can be created using the YAML enviroment file `zen_environment.yml`.
 ```
 conda env create --name zen_env --file=zen_environment.yml
 ```
