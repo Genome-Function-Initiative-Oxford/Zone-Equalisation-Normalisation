@@ -24,7 +24,7 @@ python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-u
 ```
 python -m pip install --no-cache-dir --prefer-binary --only-binary=pybigwig \
   --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple \
-  ZEN-norm-test==0.0.5
+  ZEN-norm-test
 ```
 
 ### (Optional) Conda Enviroment
