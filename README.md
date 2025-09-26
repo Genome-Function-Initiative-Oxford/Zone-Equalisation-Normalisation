@@ -2,15 +2,24 @@
 
 ZEN-norm is a Python package for normalising bigWigs by Zone Equilisation Normalisation. Additional features include modules for reversing prior bigWig normalisation and comparing normalisation methods using Wasserstein distance plots.
 
-<br>
-
 ---
+
+<br>
 
 ## Installation
 
 ### PyPI
-The ZEN-norm package can be installed from PyPI.
+To install ZEN-norm, pyBigWig must first be installed to avoid errors.
 
+```
+pip install pyBigWig
+```
+
+Then run the command below to install the ZEN-norm package from PyPI.
+
+```
+python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple ZEN-norm-test
+```
 
 ```
 python -m pip install --no-cache-dir --prefer-binary --only-binary=pybigwig \
@@ -18,21 +27,23 @@ python -m pip install --no-cache-dir --prefer-binary --only-binary=pybigwig \
   ZEN-norm-test==0.0.5
 ```
 
-### (optional) Conda Enviroment
-The conda environment to run ZEN-norm can be created by running the command:
+### (Optional) Conda Enviroment
+If there are issues installing ZEN-norm, a conda environment with the relavant packages can be created using the YAML enviroment file.
 ```
 conda env create --name zen_env --file=zen_environment.yml
 ```
 
 ## Normalisation With ZEN
-The module `ZoneNorm` is designed for normalising genomic coverage with ZEN. Steps include: ...
+The module `ZoneNorm` is for normalising genomic coverage with ZEN. Steps include: BAM to bigWig mapping, creating smoothed signals, distribution fitting, signal zone prediction and creating normalised bigWigs.
 
-### Specifying Input BAMs or BigWigs
-
+### Specifying Input BAMs or bigWigs
+ZEN-norm supports either BAM or bigWig files as an input. These contain the genomic signal of interest per sample.
 
 ```python
 bam_paths = ["path/to/bams/cell_type_A.bam", "path/to/bams/cell_type_B.bam"]
 ```
+
+If bigWigs have been pre-normalised, then it is advisable to remap them without normalisation, or to use ZEN-norm's [](reverse bigWig normalisation).
 
 ```python
 bigwig_paths = ["path/to/bams/cell_type_A.bw", "path/to/bams/cell_type_B.bw"]
