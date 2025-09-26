@@ -33,9 +33,11 @@ If there are issues installing ZEN-norm, a conda environment with the relavant p
 conda env create --name zen_env --file=zen_environment.yml
 ```
 
+<a id="zen_norm"></a>
 ## Normalisation With ZEN
 The module `ZoneNorm` is for normalising genomic coverage with ZEN. Steps include: BAM to bigWig mapping, creating smoothed signals, distribution fitting, signal zone prediction and creating normalised bigWigs.
 
+<a id="zen_norm_inputs"></a>
 ### Specifying Input BAMs or bigWigs
 ZEN-norm supports either BAM or bigWig files as an input. These contain the genomic signal of interest per sample.
 
@@ -43,7 +45,7 @@ ZEN-norm supports either BAM or bigWig files as an input. These contain the geno
 bam_paths = ["path/to/bams/cell_type_A.bam", "path/to/bams/cell_type_B.bam"]
 ```
 
-If bigWigs have been pre-normalised, then it is advisable to remap them without normalisation, or to use ZEN-norm's [](reverse bigWig normalisation).
+If bigWigs have been pre-normalised, then it is advisable to remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">reverse bigWig normalisation</a>.
 
 ```python
 bigwig_paths = ["path/to/bams/cell_type_A.bw", "path/to/bams/cell_type_B.bw"]
@@ -82,6 +84,7 @@ znorm.predictSignalZones()
 znorm.normaliseSignal()
 ```
 
+<a id="norm_compare"></a>
 ## Evaluating Normalisation Methods
 
 ### Initialisation
@@ -129,13 +132,14 @@ norm_compare.MAPlot(norm_method, plot_samples = [], chromosomes = [], n_cols = 4
                pdf_name = ""):
 ```
 
+<a id="reverse_norm"></a>
 ## Reversing Prior Normalisation
 Sometimes it is not possible or convenient to obtain bigWigs without prior normalisation. For example, if using published data that only provides bigWigs after RPKM normalisation. However, double normalisation will occur if pre-normalised bigWigs are used directly in ZoneNorm. To avoid this, it is best to first reverse normalise pre-normalised bigWigs using ReverseNorm to obtain raw bigWigs.
 
 ```python
 from ZEN_norm.reverse_norm import ReverseNorm
 
-rev = ReverseBigWigNorm(analysis_name = "Analysis", # Set custom output folder name
+rev = ReverseNorm(analysis_name = "Analysis", # Set custom output folder name
                         bigwig_paths = inputs, # Specify a list of bigWig paths
                         n_cores = 1) # Set number of cores to use
 rev.reverseNorm(chunk_size = 10000000, chromosomes = ["chr22"])
