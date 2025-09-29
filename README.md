@@ -20,7 +20,7 @@ ZEN-norm is a Python package for normalising bigWigs of genomic signal, such as 
 
 <a id="installation"></a>
 ## Installation
-ZEN-norm is designed to run on Python 3.10 and above.
+ZEN-norm is designed to run on Python 3.10 and above and is installable from either PyPI or Conda.
 
 <details>
   <summary><b>PyPI Installation</b></summary>
