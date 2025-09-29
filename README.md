@@ -33,7 +33,7 @@ python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-u
 
 <details>
   <summary><b>Conda Installation</b></summary>
-  To install the ZEN-norm package from <a href="">Conda</a>, run the command below:
+  To install the ZEN-norm package from <a href="">Conda</a>, active the conda environment you'd like to install the package into (<code>conda activate ...</code>) and run the command below:
 
 ```
 conda install zen-norm
@@ -52,18 +52,20 @@ conda install zen-norm
 The module `ZoneNorm` is for normalising genomic coverage with ZEN. Steps include: BAM to bigWig mapping, creating smoothed signals, distribution fitting, signal zone prediction and creating normalised bigWigs.
 
 <a id="zen_norm_inputs"></a>
-### Specifying Input BAMs or bigWigs
-ZEN-norm supports either BAM or bigWig files as an input. These contain the genomic signal of interest per sample.
-
-```python
-bam_paths = ["path/to/bams/cell_type_A.bam", "path/to/bams/cell_type_B.bam"]
-```
-
-If bigWigs have been pre-normalised, then it is advisable to remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">reverse bigWig normalisation</a>.
-
-```python
-bigwig_paths = ["path/to/bams/cell_type_A.bw", "path/to/bams/cell_type_B.bw"]
-```
+<details open="open">
+  <summary><b>Specifying Input BAMs or bigWigs</b></summary>
+  ZEN-norm supports either BAM or bigWig files as an input. These contain the genomic signal of interest per sample.
+  
+  ```python
+  bam_paths = ["path/to/bams/cell_type_A.bam", "path/to/bams/cell_type_B.bam"]
+  ```
+  
+  If bigWigs have been pre-normalised, then it is advisable to remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">reverse bigWig normalisation</a>.
+  
+  ```python
+  bigwig_paths = ["path/to/bams/cell_type_A.bw", "path/to/bams/cell_type_B.bw"]
+  ```
+</details>
 
 ### Initialisation of ZoneNorm Object
 
