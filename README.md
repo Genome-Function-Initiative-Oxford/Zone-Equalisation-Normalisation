@@ -22,6 +22,7 @@ ZEN-norm is a Python package for normalising bigWigs of genomic signal, such as 
 ## Installation
 ZEN-norm is designed to run on Python 3.10 and above and is installable from either PyPI or Conda.
 
+<a id=""></a>
 <details>
   <summary><b>PyPI Installation</b></summary>
   To install the ZEN-norm package from <a href="https://test.pypi.org/project/ZEN-norm-test/">PyPI</a>, run the command below:
@@ -31,6 +32,7 @@ python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-u
 ```
 </details>
 
+<a id=""></a>
 <details>
   <summary><b>Conda Installation</b></summary>
   To install the ZEN-norm package from <a href="">Conda</a>, active the conda environment you'd like to install the package into (<code>conda activate ...</code>) and run the command below:
@@ -47,11 +49,13 @@ conda install zen-norm
   ```
 </details>
 
+<br>
+
 <a id="zen_norm"></a>
 ## ZEN bigWig Normalisation
 The module `ZoneNorm` is for normalising genomic coverage with ZEN. Steps include: BAM to bigWig mapping, creating smoothed signals, distribution fitting, signal zone prediction and creating normalised bigWigs.
 
-<a id="zen_norm_inputs"></a>
+<a id=""></a>
 <details open="open">
   <summary><b>Specifying Input BAMs or bigWigs</b></summary>
   ZEN-norm supports either BAM or bigWig files as an input. These contain the genomic signal of interest per sample.
@@ -65,11 +69,15 @@ The module `ZoneNorm` is for normalising genomic coverage with ZEN. Steps includ
   ```python
   bigwig_paths = ["path/to/bams/cell_type_A.bw", "path/to/bams/cell_type_B.bw"]
   ```
+
+  <br>
 </details>
 
-### Initialisation of ZoneNorm Object
 
-
+<a id=""></a>
+<details open="open">
+  <summary><b>Initialisation of ZoneNorm Object</b></summary>
+  
 ```python
 from ZEN_norm.zone_norm import ZoneNorm
 
@@ -79,7 +87,6 @@ znorm = ZoneNorm(analysis_name = "Analysis_Name",
                  n_cores = n_cores,
                  norm_method = "ZEN")
 ```
-
 ```python
 # Open each bigWig and extract signal to arrays
 znorm.readBigWigSignals()
@@ -99,11 +106,16 @@ znorm.predictSignalZones()
 # Create normalised bigWigs
 znorm.normaliseSignal()
 ```
+</details>
+
+<br>
 
 <a id="norm_compare"></a>
 ## Plots for Evaluating Normalisation Method Performance
 
-### Initialisation
+<a id=""></a>
+<details open="open">
+  <summary><b>Initialisation</b></summary>
 
 | Norm    | Sample | bigWig |
 | -------- | ------- | ------- |
@@ -112,7 +124,6 @@ znorm.normaliseSignal()
 | ZEN | Cell_Type_A | path/to/bams/cell_type_A_ZEN.bw |
 | ZEN | Cell_Type_B | path/to/bams/cell_type_B_ZEN.bw |
 | ... | ... | ... |
-
 
 ```python
 bw_df = pd.DataFrame({"norm": np.array([[m] * len(sample_names) for m in norm_methods]).flatten(), 
@@ -134,6 +145,9 @@ norm_compare = NormCompare(bigwig_df = bw_df,
                            analysis_name = = "Analysis_Name",
                            verbose = 2)
 ```
+  
+  <br>
+</details>
 
 ### Creating Wasserstein Plots
 ```python
@@ -146,6 +160,8 @@ norm_compare.MAPlot(norm_method, plot_samples = [], chromosomes = [], n_cols = 4
                point_transparency = 0.3, point_colour = "grey", title = "", plot_width = 8, plot_height = 6,
                pdf_name = ""):
 ```
+
+<br>
 
 <a id="reverse_norm"></a>
 ## Reversing Prior bigWig Normalisation
