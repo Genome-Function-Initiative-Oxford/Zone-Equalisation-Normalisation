@@ -1,6 +1,6 @@
 # Zone Equalisation Normalisation
 
-ZEN-norm is a Python package for normalising bigWigs by Zone Equilisation Normalisation, creating plots to compare normalisation method performance and reversing prior bigWig normalisation.
+ZEN-norm is a Python package for normalising bigWigs of genomic signal, such as ATAC-seq, ChIP-seq and TT-seq by Zone Equilisation Normalisation. Other features include: creating plots to compare normalisation method performance and reversing prior bigWig normalisation.
 
 ---
 
@@ -20,8 +20,9 @@ ZEN-norm is a Python package for normalising bigWigs by Zone Equilisation Normal
 
 <a id="installation"></a>
 ## Installation
+ZEN-norm is designed to run on Python 3.10 and above.
 
-<details open="open">
+<details>
   <summary><b>PyPI Installation</b></summary>
   To install the ZEN-norm package from PyPI, run the command below:
 
@@ -30,7 +31,7 @@ python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-u
 ```
 </details>
 
-<details open="open">
+<details>
   <summary><b>Conda Installation</b></summary>
   To install the ZEN-norm package from Conda, run the command below:
 
