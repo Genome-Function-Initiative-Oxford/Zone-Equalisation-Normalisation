@@ -21,18 +21,23 @@ ZEN-norm is a Python package for normalising bigWigs by Zone Equilisation Normal
 <a id="installation"></a>
 ## Installation
 
-### PyPI
-To install the ZEN-norm package from PyPI, run the command below:
+<details open="open">
+  <summary><b>PyPI</b></summary>
+  To install the ZEN-norm package from PyPI, run the command below:
 
 ```
 python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple ZEN-norm-test
 ```
+</details>
 
-### (Optional) Conda Enviroment
-If there are issues installing ZEN-norm, a conda environment with the relevant packages can be created using the YAML enviroment file `zen_environment.yml`.
+<details open="open">
+  <summary><b>(Optional) Conda Enviroment</b></summary>
+  If there are issues installing ZEN-norm, a conda environment with the relevant packages can be created using the <code>zen_environment.yml</code> file.
+
 ```
-conda env create --name zen_env --file=zen_environment.yml
+conda env create --name zen_env --file=environment/zen_environment.yml
 ```
+</details>
 
 <a id="zen_norm"></a>
 ## ZEN bigWig Normalisation
@@ -122,8 +127,7 @@ norm_compare = NormCompare(bigwig_df = bw_df,
 
 ### Creating Wasserstein Plots
 ```python
-norm_compare.plotWasserstein(chromosomes = [], plot_samples = [], norm_methods = [], use_chrom_maxs = False,
-                             reference_norm = "ZEN", log_scale = False, pdf_name = "TTseq_Gumbell")
+norm_compare.plotWasserstein(reference_norm = "ZEN", pdf_name = "Wasserstein_Plot.pdf")
 ```
 
 ### Creating MA Plots
