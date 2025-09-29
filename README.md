@@ -22,7 +22,7 @@ ZEN-norm is a Python package for normalising bigWigs by Zone Equilisation Normal
 ## Installation
 
 <details open="open">
-  <summary><b>Install from PyPI</b></summary>
+  <summary><b>PyPI Installation</b></summary>
   To install the ZEN-norm package from PyPI, run the command below:
 
 ```
@@ -31,21 +31,18 @@ python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-u
 </details>
 
 <details open="open">
-  <summary><b>Install from Conda</b></summary>
+  <summary><b>Conda Installation</b></summary>
   To install the ZEN-norm package from Conda, run the command below:
 
 ```
 TBC
 ```
-</details>
 
-<details>
-  <summary><b>Creating a Conda Enviroment for ZEN-norm</b></summary>
-  If there are issues installing ZEN-norm, a conda environment with the relevant packages can be created using the <code>zen_environment.yml</code> file.
+  Alternatively, if there are issues installing ZEN-norm, a conda environment with the required packages can be created using the <code>zen_environment.yml</code> file.
 
-```
-conda env create --name zen_env --file=environment/zen_environment.yml
-```
+  ```
+  conda env create --name zen_env --file=environment/zen_environment.yml
+  ```
 </details>
 
 <a id="zen_norm"></a>
