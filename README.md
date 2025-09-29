@@ -6,8 +6,6 @@ ZEN-norm is a Python package for normalising bigWigs of genomic signal, such as 
 
 ---
 
-<br>
-
 <details open="open">
   <summary><b>Contents</b></summary>
   <ol>
@@ -17,6 +15,8 @@ ZEN-norm is a Python package for normalising bigWigs of genomic signal, such as 
     <li><a href="#reverse_norm">Reversing Prior bigWig Normalisation</a></li>
   </ol>
 </details>
+
+<br>
 
 ---
 
@@ -53,28 +53,36 @@ conda install zen-norm
 
 <br>
 
+---
+
 <a id="zen_norm"></a>
 ## ZEN bigWig Normalisation
 The module `ZoneNorm` is for normalising genomic coverage with ZEN. Steps include: BAM to bigWig mapping, creating smoothed signals, distribution fitting, signal zone prediction and creating normalised bigWigs.
 
+<br>
+
 <a id=""></a>
 <details open="open">
   <summary><b>Specifying Input BAMs or bigWigs</b></summary>
-  ZEN-norm supports either BAM or bigWig files as an input. These contain the genomic signal of interest per sample.
+  ZEN-norm supports either BAM or bigWig files as an input. These should contain the genomic signal of interest per sample. If your input files are bigWigs that have been pre-normalised, then it is advisable to first remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">reverse bigWig normalisation</a> feature.
+
+<br>
+
+  These input files must be specified as either a list of file paths or a directory. For example, if you have a folder containing two BAMs (<code>cell_type_A.bam</code> and <code>cell_type_B.bam</code>) and non-normalised bigWigs for the same samples (<code>cell_type_A.bw</code> and <code>cell_type_B.bw</code>), you can specify the input in one of four ways:
   
-  ```python
-  bam_paths = ["path/to/bams/cell_type_A.bam", "path/to/bams/cell_type_B.bam"]
-  ```
-  
-  If bigWigs have been pre-normalised, then it is advisable to remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">reverse bigWig normalisation</a>.
-  
-  ```python
-  bigwig_paths = ["path/to/bams/cell_type_A.bw", "path/to/bams/cell_type_B.bw"]
-  ```
+```python
+# Specify specific BAMs
+bam_paths = ["path/to/bams/cell_type_A.bam", "path/to/bams/cell_type_B.bam"]
+# Or specify specific bigWigs
+bigwig_paths = ["path/to/bws/cell_type_A.bw", "path/to/bws/cell_type_B.bw"]
+# Or set directory containing BAMs
+bam_dir = "path/to/bams"
+# Or set directory containing bigWigs
+bigwig_dir = "path/to/bws"
+```
 
   <br>
 </details>
-
 
 <a id=""></a>
 <details open="open">
@@ -112,8 +120,12 @@ znorm.normaliseSignal()
 
 <br>
 
+---
+
 <a id="norm_compare"></a>
 ## Plots for Evaluating Normalisation Method Performance
+
+<br>
 
 <a id=""></a>
 <details open="open">
@@ -165,9 +177,13 @@ norm_compare.MAPlot(norm_method, plot_samples = [], chromosomes = [], n_cols = 4
 
 <br>
 
+---
+
 <a id="reverse_norm"></a>
 ## Reversing Prior bigWig Normalisation
 Sometimes it is not possible or convenient to obtain bigWigs without prior normalisation. For example, if using published data that only provides bigWigs after RPKM normalisation. However, double normalisation will occur if pre-normalised bigWigs are used directly in ZoneNorm. To avoid this, it is best to first reverse normalise pre-normalised bigWigs using ReverseNorm to obtain raw bigWigs.
+
+<br>
 
 ```python
 from ZEN_norm.reverse_norm import ReverseNorm
