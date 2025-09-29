@@ -35,7 +35,7 @@ python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-u
   To install the ZEN-norm package from Conda, run the command below:
 
 ```
-TBC
+conda install zen-norm
 ```
 
   Alternatively, if there are issues installing ZEN-norm, a conda environment with the required packages can be created using the <code>zen_environment.yml</code> file.
