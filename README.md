@@ -30,7 +30,7 @@ python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-u
 ```
 </details>
 
-<details open="open">
+<details>
   <summary><b>(Optional) Conda Enviroment</b></summary>
   If there are issues installing ZEN-norm, a conda environment with the relevant packages can be created using the <code>zen_environment.yml</code> file.
 
