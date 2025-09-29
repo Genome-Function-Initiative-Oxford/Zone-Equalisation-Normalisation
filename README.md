@@ -1,6 +1,6 @@
 # Zone Equalisation Normalisation
 
-ZEN-norm is a Python package for normalising bigWigs by Zone Equilisation Normalisation. Additional features include modules for reversing prior bigWig normalisation and comparing normalisation methods using Wasserstein distance plots.
+ZEN-norm is a Python package for normalising bigWigs by Zone Equilisation Normalisation, creating plots to compare normalisation method performance and reversing prior bigWig normalisation.
 
 ---
 
@@ -42,6 +42,7 @@ conda install zen-norm
 
   ```
   conda env create --name zen_env --file=environment/zen_environment.yml
+  conda activate zen_env
   ```
 </details>
 
