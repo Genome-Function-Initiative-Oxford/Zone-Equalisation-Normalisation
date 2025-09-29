@@ -24,7 +24,7 @@ ZEN-norm is designed to run on Python 3.10 and above.
 
 <details>
   <summary><b>PyPI Installation</b></summary>
-  To install the ZEN-norm package from PyPI, run the command below:
+  To install the ZEN-norm package from <a href="https://test.pypi.org/project/ZEN-norm-test/">PyPI</a>, run the command below:
 
 ```
 python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple ZEN-norm-test
@@ -33,7 +33,7 @@ python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-u
 
 <details>
   <summary><b>Conda Installation</b></summary>
-  To install the ZEN-norm package from Conda, run the command below:
+  To install the ZEN-norm package from <a href="">Conda</a>, run the command below:
 
 ```
 conda install zen-norm
