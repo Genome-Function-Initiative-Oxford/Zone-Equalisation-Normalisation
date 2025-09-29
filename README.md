@@ -86,7 +86,8 @@ bigwig_dir = "path/to/bws"
 
 <a id=""></a>
 <details open="open">
-  <summary><b>Initialisation of ZoneNorm Object</b></summary>
+  <summary><b>Initialisation of a ZoneNorm Object</b></summary>
+  After specifying the input files, 
   
 ```python
 from ZEN_norm.zone_norm import ZoneNorm
@@ -97,25 +98,51 @@ znorm = ZoneNorm(analysis_name = "Analysis_Name",
                  n_cores = n_cores,
                  norm_method = "ZEN")
 ```
+
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Creating Smoothed Signal</b></summary>
+  
 ```python
 # Open each bigWig and extract signal to arrays
 znorm.readBigWigSignals()
 ```
 
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Distribution Fitting</b></summary>
+  
 ```python
 # Fit distributions for signal zone prediction
 znorm.testDistributions()
 ```
 
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Signal Zone Prediction</b></summary>
+  
 ```python
 # Use distribution to predict signal zone coordinates
 znorm.predictSignalZones()
 ```
 
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Creating Normalised bigWigs</b></summary>
+  
 ```python
 # Create normalised bigWigs
 znorm.normaliseSignal()
 ```
+
 </details>
 
 <br>
