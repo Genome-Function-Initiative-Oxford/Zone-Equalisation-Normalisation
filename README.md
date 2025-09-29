@@ -6,6 +6,19 @@ ZEN-norm is a Python package for normalising bigWigs by Zone Equilisation Normal
 
 <br>
 
+<details open="open">
+  <summary><b>Contents</b></summary>
+  <ol>
+    <li><a href="#installation">Installation</a></li>
+    <li><a href="#zen_norm">ZEN bigWig Normalisation</a></li>
+    <li><a href="#norm_compare">Plots for Evaluating Normalisation Method Performance</a></li>
+    <li><a href="#reverse_norm">Reversing Prior bigWig Normalisation</a></li>
+  </ol>
+</details>
+
+---
+
+<a id="installation"></a>
 ## Installation
 
 ### PyPI
@@ -22,7 +35,7 @@ conda env create --name zen_env --file=zen_environment.yml
 ```
 
 <a id="zen_norm"></a>
-## Normalisation With ZEN
+## ZEN bigWig Normalisation
 The module `ZoneNorm` is for normalising genomic coverage with ZEN. Steps include: BAM to bigWig mapping, creating smoothed signals, distribution fitting, signal zone prediction and creating normalised bigWigs.
 
 <a id="zen_norm_inputs"></a>
@@ -73,7 +86,7 @@ znorm.normaliseSignal()
 ```
 
 <a id="norm_compare"></a>
-## Evaluating Normalisation Methods
+## Plots for Evaluating Normalisation Method Performance
 
 ### Initialisation
 
@@ -121,7 +134,7 @@ norm_compare.MAPlot(norm_method, plot_samples = [], chromosomes = [], n_cols = 4
 ```
 
 <a id="reverse_norm"></a>
-## Reversing Prior Normalisation
+## Reversing Prior bigWig Normalisation
 Sometimes it is not possible or convenient to obtain bigWigs without prior normalisation. For example, if using published data that only provides bigWigs after RPKM normalisation. However, double normalisation will occur if pre-normalised bigWigs are used directly in ZoneNorm. To avoid this, it is best to first reverse normalise pre-normalised bigWigs using ReverseNorm to obtain raw bigWigs.
 
 ```python
