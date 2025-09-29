@@ -160,3 +160,4 @@ dependencies:
   - xorg-libxtst=1.2.5=hb9d3cd8_3
   - xorg-libxxf86vm=1.1.6=hb9d3cd8_0
   - zstd=1.5.7=hb8e6e7a_2
+  - zen-norm
