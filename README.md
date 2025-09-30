@@ -25,7 +25,7 @@ ZEN-norm is a Python package for normalising bigWigs of genomic signal, such as 
 ZEN-norm is designed to run on Python 3.10 and above and is installable from either PyPI or Conda.
 
 <a id=""></a>
-<details>
+<details open="open">
   <summary><b>PyPI Installation</b></summary>
   To install the ZEN-norm package from <a href="https://test.pypi.org/project/ZEN-norm-test/">PyPI</a>, run the command below:
 
@@ -35,7 +35,7 @@ python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-u
 </details>
 
 <a id=""></a>
-<details>
+<details open="open">
   <summary><b>Conda Installation</b></summary>
   To install the ZEN-norm package from <a href="">Conda</a>, active the conda environment you'd like to install the package into (<code>conda activate ...</code>) and run the command below:
 
