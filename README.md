@@ -76,9 +76,9 @@ bam_paths = ["path/to/bams/cell_type_A.bam", "path/to/bams/cell_type_B.bam"]
 # Or specify specific bigWigs
 bigwig_paths = ["path/to/bws/cell_type_A.bw", "path/to/bws/cell_type_B.bw"]
 # Or set directory containing BAMs
-bam_dir = "path/to/bams"
+bam_directory = "path/to/bams"
 # Or set directory containing bigWigs
-bigwig_dir = "path/to/bws"
+bigwig_directory = "path/to/bws"
 ```
 
   <br>
