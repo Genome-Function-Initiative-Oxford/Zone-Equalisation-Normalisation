@@ -64,12 +64,14 @@ The module `ZoneNorm` is for normalising genomic coverage with ZEN. Steps includ
 <a id=""></a>
 <details open="open">
   <summary><b>Specifying Input BAMs or bigWigs</b></summary>
-  ZEN-norm supports either BAM or bigWig files as an input. These should contain the genomic signal of interest per sample. If your input files are bigWigs that have been pre-normalised, then it is advisable to first remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">reverse bigWig normalisation</a> feature.
+  ZEN-norm is designed to run on genomic signals from either BAM or bigWig files. The input files must be specified as either a list of file paths or a directory. If your input files are bigWigs that have been pre-normalised, then it is advisable to first remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">reverse bigWig normalisation</a> feature.
 
-<br>
+  <br>
 
-  These input files must be specified as either a list of file paths or a directory. For example, if you have a folder containing two BAMs (<code>cell_type_A.bam</code> and <code>cell_type_B.bam</code>) and non-normalised bigWigs for the same samples (<code>cell_type_A.bw</code> and <code>cell_type_B.bw</code>), you can specify the input in one of four ways:
-  
+  <details>
+    <summary><b><sub>Click for Example</sub></b></summary>
+    Say you have a folder containing two BAMs (<code>cell_type_A.bam</code> and <code>cell_type_B.bam</code>) and non-normalised bigWigs for the same samples (<code>cell_type_A.bw</code> and <code>cell_type_B.bw</code>), you can specify the input in one of four ways:
+
 ```python
 # Specify specific BAMs
 bam_paths = ["path/to/bams/cell_type_A.bam", "path/to/bams/cell_type_B.bam"]
@@ -80,6 +82,8 @@ bam_directory = "path/to/bams"
 # Or set directory containing bigWigs
 bigwig_directory = "path/to/bws"
 ```
+    
+  </details>
 
   <br>
 </details>
