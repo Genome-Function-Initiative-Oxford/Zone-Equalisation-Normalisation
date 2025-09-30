@@ -13,6 +13,7 @@ ZEN-norm is a Python package for normalising bigWigs of genomic signal, such as 
     <li><a href="#zen_norm">ZEN bigWig Normalisation</a></li>
     <li><a href="#norm_compare">Plots for Evaluating Normalisation Method Performance</a></li>
     <li><a href="#reverse_norm">Reversing Prior bigWig Normalisation</a></li>
+    <li><a href="#visualising_bigwigs">Visualising bigWigs</a></li>
   </ol>
 </details>
 
@@ -224,3 +225,18 @@ rev = ReverseNorm(analysis_name = "Analysis", # Set custom output folder name
                         n_cores = 1) # Set number of cores to use
 rev.reverseNorm(chunk_size = 10000000, chromosomes = ["chr22"])
 ```
+
+## Visualising bigWigs
+UCSC Genome browser or Multi Locus View
+
+<a id=""></a>
+<details open="open">
+  <summary><b>UCSC Genome browser</b></summary>
+  ...
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Multi Locus View (MLV)</b></summary>
+  ...
+</details>
