@@ -231,6 +231,16 @@ UCSC Genome browser or Multi Locus View
 
 <a id=""></a>
 <details open="open">
+  <summary><b>ZEN-norm Signal Plots</b></summary>
+
+```python
+znorm.plotTracks(start_coord = 342825, end_coord = 357106, chromosome = "chr5", 
+                 plot_samples = znorm.regexFindSamples(regex = "1_neg", ignore_case = True))
+```
+</details>
+
+<a id=""></a>
+<details open="open">
   <summary><b>UCSC Genome browser</b></summary>
   ...
 </details>
