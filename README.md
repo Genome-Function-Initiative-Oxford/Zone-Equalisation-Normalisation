@@ -123,17 +123,36 @@ bigwig_directory = "mESC/mm10/bigWigs"
 <a id=""></a>
 <details open="open">
   <summary><b>Initialisation of a ZoneNorm Object</b></summary>
-  After specifying the input files, 
+  After deciding the input files, a <code>ZoneNorm</code> object must be created to specify the parameters for normalisation. For example: 
   
 ```python
 from ZEN_norm.zone_norm import ZoneNorm
 
 # Create ZoneNorm object
-znorm = ZoneNorm(analysis_name = "Analysis_Name",
-                 bigwig_paths = input_paths,
-                 n_cores = n_cores,
+znorm = ZoneNorm(analysis_name = "mESC_Analysis",
+                 bigwig_paths = ["mESC/mm10/BAMs/E14_ATAC_RA.bam", "mESC/mm10/BAMs/E14_ATAC_LIF.bam"],
+                 n_cores = 4,
                  norm_method = "ZEN")
 ```
+
+  Key parameters for this include:
+
+  <details>
+    <summary><b><sub>analysis_name</sub></b></summary>
+    The name of the output folder to save results to.
+  </details>
+  <details>
+    <summary><b><sub>bam_paths, bam_directory, bigwig_paths or bigwig_directory</sub></b></summary>
+    The 
+  </details>
+  <details>
+    <summary><b><sub>n_cores</sub></b></summary>
+    The number of 
+  </details>
+  <details>
+    <summary><b><sub>norm_method</sub></b></summary>
+    Name of the normalisation method to apply. Options include: <code>ZEN</code>
+  </details>
 
 </details>
 
