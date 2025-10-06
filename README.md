@@ -58,24 +58,20 @@ conda install zen-norm
 
 <a id="example_data"></a>
 ## Example Data
-For the following tutorials, we will use 
+For the following tutorial, we demonstrate the features of ZEN-norm using the following publically avaliable data.
 
 <a id=""></a>
 <details open="open">
-  <summary><b></b></summary>
+  <summary><b>Mouse Embryo ATAC-seq</b></summary>
+  E14 leukemia inhibitory factor (LIF) and retinoic acid (RA)
   
+  <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE120376">GSE120376</a>
 
 ```
 wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399495&format=file&file=GSM3399495%5FE14%5FATAC%5FRA%2Ebw" -O E14_ATAC_RA.bw
 wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file=GSM3399494%5FE14%5FATAC%5FLIF%2Ebw" -O E14_ATAC_LIF.bw
 ```
 
-  Alternatively, if there are issues installing ZEN-norm, a conda environment with the required packages can be created using the <code>zen_environment.yml</code> file.
-
-  ```
-  conda env create --name zen_env --file=environment/zen_environment.yml
-  conda activate zen_env
-  ```
 </details>
 
 <br>
