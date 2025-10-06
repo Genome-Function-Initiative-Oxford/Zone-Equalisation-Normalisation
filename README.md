@@ -135,7 +135,7 @@ znorm = ZoneNorm(analysis_name = "mESC_Analysis",
                  norm_method = "ZEN")
 ```
 
-  Key parameters for this include:
+  Key parameters for include:
 
 | Parameter | Usage |
 | -------- | ------- |
@@ -146,6 +146,39 @@ znorm = ZoneNorm(analysis_name = "mESC_Analysis",
 | <code>bam_directory</code> |  |
 | <code>n_cores</code> | The number of  |
 | <code>norm_method</code> | Name of the normalisation method to apply. Options include: <code>ZEN</code> |
+
+Additional parameters:
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>chromosomes</code> |  |
+| <code>chrom_sizes_file</code> |  |
+| <code>interleave_sizes</code> |  |
+| <code>sample_names</code> |  |
+| <code>blacklist</code> |  |
+| <code>genome_size</code> |  |
+| <code>extend_reads</code> |  |
+| <code>filter_strand</code> |  |
+| <code>exclude_zero</code> |  |
+| <code>zone_remove_percent</code> |  |
+| <code>norm_stats_type</code> |  |
+| <code>norm_power</code> |  |
+| <code>deletion_size</code> |  |
+| <code>downsample_size</code> |  |
+| <code>downsample_seed</code> |  |
+| <code>kernel</code> |  |
+| <code>test_distributions</code> |  |
+| <code>log_transform</code> |  |
+| <code>zone_distribution</code> |  |
+| <code>zone_param_type</code> |  |
+| <code>zone_probability</code> |  |
+| <code>bin_size</code> |  |
+| <code>extend_n_bins</code> |  |
+| <code>merge_depth</code> |  |
+| <code>min_region_bps</code> |  |
+| <code>quality_filter</code> |  |
+| <code>min_different_bps</code> |  |
+| <code>verbose</code> |  |
 
 </details>
 
