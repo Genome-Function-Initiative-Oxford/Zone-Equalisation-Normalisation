@@ -63,9 +63,7 @@ For the following tutorial, we demonstrate the features of ZEN-norm using the fo
 <a id=""></a>
 <details open="open">
   <summary><b>Mouse Embryo ATAC-seq</b></summary>
-  E14 leukemia inhibitory factor (LIF) and retinoic acid (RA)
-  
-  <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE120376">GSE120376</a>
+  E14 mouse embryonic stem cells (mESCs) treated with leukemia inhibitory factor (LIF) and retinoic acid (RA) (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE120376">GSE120376</a>).
 
 ```
 wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399495&format=file&file=GSM3399495%5FE14%5FATAC%5FRA%2Ebw" -O E14_ATAC_RA.bw
