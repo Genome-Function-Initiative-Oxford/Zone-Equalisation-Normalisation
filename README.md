@@ -185,7 +185,9 @@ znorm = ZoneNorm(analysis_name = "mESC_Analysis",
 | <code>verbose</code> | Set as an integer greater than 0 to display progress messages. |
 
   </details>
-
+  
+  <br>
+  
 </details>
 
 <a id=""></a>
@@ -208,6 +210,8 @@ znorm.readBigWigSignals()
 
   </details>
 
+  <br>
+
 </details>
 
 <a id=""></a>
@@ -229,6 +233,8 @@ znorm.testDistributions()
 | <code>replace_existing</code> | Set as <code>True</code> to overwrite previously created files. |
 
   </details>
+  
+  <br>
 
 </details>
 
@@ -251,6 +257,8 @@ znorm.predictSignalZones()
 | <code>replace_existing</code> | Set as <code>True</code> to overwrite previously created files. |
 
   </details>
+
+  <br>
 
 </details>
 
