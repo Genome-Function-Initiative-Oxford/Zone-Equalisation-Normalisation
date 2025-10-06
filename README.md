@@ -136,7 +136,7 @@ znorm = ZoneNorm(analysis_name = "mESC_Analysis",
 ```
 
   <details>
-    <summary open="open"><b><sub>Key parameters</sub></b></summary>
+    <summary open="open"><b><sub>Key Parameters</sub></b></summary>
 
 | Parameter | Usage |
 | -------- | ------- |
@@ -151,7 +151,7 @@ znorm = ZoneNorm(analysis_name = "mESC_Analysis",
   </details>
 
   <details>
-    <summary open="open"><b><sub>Additional parameters</sub></b></summary>
+    <summary open="open"><b><sub>Additional Parameters</sub></b></summary>
 
 | Parameter | Usage |
 | -------- | ------- |
@@ -190,12 +190,23 @@ znorm = ZoneNorm(analysis_name = "mESC_Analysis",
 
 <a id=""></a>
 <details open="open">
-  <summary><b>Creating Smoothed Signal</b></summary>
+  <summary><b>Creating Convolved Signal</b></summary>
+  After initialising the <code>ZoneNorm</code> object, the next step is to run <code>readBigWigSignals</code>. This method reads signal from bigWigs, calculates statistics about the signal and creates a convolved version of the signal to use for distribution fitting. 
   
 ```python
-# Open each bigWig and extract signal to arrays
+# Extract signal from each bigWig and created smoothed version
 znorm.readBigWigSignals()
 ```
+
+  <details>
+    <summary><b><sub>Optional Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>chromosomes</code> | List of chromosomes to read signal from per bigWig. |
+| <code>replace_existing</code> | Set as <code>True</code> to overwrite previously created files. |
+
+  </details>
 
 </details>
 
