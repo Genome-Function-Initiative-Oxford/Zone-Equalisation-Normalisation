@@ -418,7 +418,19 @@ rev.reverseNorm(chunk_size = 10000000, chromosomes = ["chr22"])
 
 <a id="visualising_bigwigs"></a>
 ## Visualising bigWigs
-UCSC Genome browser or Multi Locus View
+To visualise signal both before and / or after normalisation, it is recommended that you view signal on a genome browser such as UCSC or MLV. In addition, regions of bigWig signal can be viewed using ZEN-norm track plots.
+
+<a id=""></a>
+<details open="open">
+  <summary><b>UCSC Genome browser</b></summary>
+  <a href="https://genome.ucsc.edu/index.html">UCSC</a>
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Multi Locus View (MLV)</b></summary>
+  <a href="https://mlv.molbiol.ox.ac.uk/">MLV</a>
+</details>
 
 <a id=""></a>
 <details open="open">
@@ -428,16 +440,4 @@ UCSC Genome browser or Multi Locus View
 znorm.plotTracks(start_coord = 342825, end_coord = 357106, chromosome = "chr5", 
                  plot_samples = znorm.regexFindSamples(regex = "1_neg", ignore_case = True))
 ```
-</details>
-
-<a id=""></a>
-<details open="open">
-  <summary><b>UCSC Genome browser</b></summary>
-  ...
-</details>
-
-<a id=""></a>
-<details open="open">
-  <summary><b>Multi Locus View (MLV)</b></summary>
-  ...
 </details>
