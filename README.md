@@ -63,7 +63,7 @@ For the following tutorial, we demonstrate the features of ZEN-norm using the fo
 <a id=""></a>
 <details open="open">
   <summary><b>Mouse Embryonic Stem Cell ATAC-seq</b></summary>
-  This dataset contains ATAC-seq of E14 mouse embryonic stem cells (mESCs) treated with leukemia inhibitory factor (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399494">LIF</a>) and retinoic acid (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399495">RA</a>) (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE120376">GSE120376</a>). Two bigWigs for these mapped to the mm10 genome can be downloaded from NCBI GEO using the following commands:
+  This dataset contains ATAC-seq of E14 mouse embryonic stem cells (mESCs) treated with leukeamia inhibitory factor (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399494">LIF</a>) and retinoic acid (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399495">RA</a>) (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE120376">GSE120376</a>). Two bigWigs for these mapped to the mm10 genome can be downloaded from NCBI GEO using the following commands:
 
 ```
 wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399495&format=file&file=GSM3399495%5FE14%5FATAC%5FRA%2Ebw" -O E14_ATAC_RA.bw
@@ -213,33 +213,66 @@ znorm.readBigWigSignals()
 <a id=""></a>
 <details open="open">
   <summary><b>Distribution Fitting</b></summary>
+  After creating a smoothed version of the signal, distributions are fitted to it via <code>testDistributions</code>. This method further transforms the smoothed signal, and tests how well different distributions fit this transformed signal. The aim of this is for the selected distribution to be used after for signal zone prediction.
   
 ```python
 # Fit distributions for signal zone prediction
 znorm.testDistributions()
 ```
 
+  <details>
+    <summary><b><sub>Optional Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>chromosomes</code> | List of chromosomes to read signal from per bigWig. |
+| <code>replace_existing</code> | Set as <code>True</code> to overwrite previously created files. |
+
+  </details>
+
 </details>
 
 <a id=""></a>
 <details open="open">
   <summary><b>Signal Zone Prediction</b></summary>
+  Signal zones are predicted using one of the distributions fitted in the previous step.
   
 ```python
 # Use distribution to predict signal zone coordinates
 znorm.predictSignalZones()
 ```
 
+  <details>
+    <summary><b><sub>Optional Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>chromosomes</code> | List of chromosomes to read signal from per bigWig. |
+| <code>replace_existing</code> | Set as <code>True</code> to overwrite previously created files. |
+
+  </details>
+
 </details>
 
 <a id=""></a>
 <details open="open">
   <summary><b>Creating Normalised bigWigs</b></summary>
+  Finally, the signal is normalised and outputted as bigWigs. For ZEN normalisation, this defaults to dividing signal by standard deviation within signal zones.
   
 ```python
 # Create normalised bigWigs
 znorm.normaliseSignal()
 ```
+
+  <details>
+    <summary><b><sub>Optional Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>chromosomes</code> | List of chromosomes to read signal from per bigWig. |
+| <code>replace_existing</code> | Set as <code>True</code> to overwrite previously created files. |
+
+  </details>
 
 </details>
 
@@ -249,6 +282,7 @@ znorm.normaliseSignal()
 
 <a id="norm_compare"></a>
 ## Plots for Evaluating Normalisation Method Performance
+To quantify genome-wide performance across normalisation methods, Wasserstein distribution plots or MA plots can be created.
 
 <br>
 
@@ -288,17 +322,72 @@ norm_compare = NormCompare(bigwig_df = bw_df,
   <br>
 </details>
 
-### Creating Wasserstein Plots
+<a id=""></a>
+<details open="open">
+  <summary><b>Creating Wasserstein Distribution Plots</b></summary>
+
 ```python
 norm_compare.plotWasserstein(reference_norm = "ZEN", pdf_name = "Wasserstein_Plot.pdf")
 ```
 
-### Creating MA Plots
+  <details>
+    <summary open="open"><b><sub>Key Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>reference_norm</code> |  |
+| <code>pdf_name</code> |  |
+
+  </details>
+
+  <details>
+    <summary open="open"><b><sub>Additional Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code></code> |  |
+
+  </details>
+  
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Creating MA Plots</b></summary>
+
 ```python
 norm_compare.MAPlot(norm_method, plot_samples = [], chromosomes = [], n_cols = 4,
                point_transparency = 0.3, point_colour = "grey", title = "", plot_width = 8, plot_height = 6,
                pdf_name = ""):
 ```
+
+  <details>
+    <summary open="open"><b><sub>Key Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>norm_method</code> |  |
+| <code>pdf_name</code> |  |
+
+  </details>
+
+  <details>
+    <summary open="open"><b><sub>Additional Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>plot_samples</code> |  |
+| <code>chromosomes</code> |  |
+| <code>n_cols</code> |  |
+| <code>point_transparency</code> |  |
+| <code>point_colour</code> |  |
+| <code>title</code> |  |
+| <code>plot_width</code> |  |
+| <code>plot_height</code> |  |
+
+  </details>
+  
+</details>
 
 <br>
 
