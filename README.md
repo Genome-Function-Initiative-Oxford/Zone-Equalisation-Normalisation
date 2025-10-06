@@ -63,10 +63,12 @@ For the following tutorial, we demonstrate the features of ZEN-norm using the fo
 <a id=""></a>
 <details open="open">
   <summary><b>Mouse Embryonic Stem Cell ATAC-seq</b></summary>
-  This dataset contains ATAC-seq of E14 mouse embryonic stem cells (mESCs) treated with leukemia inhibitory factor (LIF) and retinoic acid (RA) (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE120376">GSE120376</a>). BigWigs mapped to mm10 are downloadable from NCBI GEO using the following commands:
+  This dataset contains ATAC-seq of E14 mouse embryonic stem cells (mESCs) treated with <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399494">leukemia inhibitory factor (LIF)</a> and <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399495">retinoic acid (RA)</a> (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE120376">GSE120376</a>). Two bigWigs for these mapped to the mm10 genome can be downloaded from NCBI GEO using the following commands:
 
 ```
 wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399495&format=file&file=GSM3399495%5FE14%5FATAC%5FRA%2Ebw" -O E14_ATAC_RA.bw
+```
+```
 wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file=GSM3399494%5FE14%5FATAC%5FLIF%2Ebw" -O E14_ATAC_LIF.bw
 ```
 
@@ -85,25 +87,34 @@ The module `ZoneNorm` is for normalising genomic coverage with ZEN. Steps includ
 <a id=""></a>
 <details open="open">
   <summary><b>Specifying Input BAMs or bigWigs</b></summary>
-  ZEN-norm is designed to run on genomic signals from either BAM or bigWig files. The input files must be specified as either a list of file paths or a directory. If your input files are bigWigs that have been pre-normalised, then it is advisable to first remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">reverse bigWig normalisation</a> feature.
+  ZEN-norm is designed to run on genomic signals from either BAM or bigWig files. Input files must be specified as either a list of file paths or a directory. If your input files are bigWigs that have been pre-normalised, then it is advisable to first remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">reverse bigWig normalisation</a> feature.
 
   <br>
 
   <details>
-    <summary><b><sub>Click for Example</sub></b></summary>
-    Say you have a folder containing two BAMs (<code>cell_type_A.bam</code> and <code>cell_type_B.bam</code>) and non-normalised bigWigs for the same samples (<code>cell_type_A.bw</code> and <code>cell_type_B.bw</code>), you can specify the input in one of four ways:
+    <summary><b><sub>Click for BAM Example</sub></b></summary>
+    Say you have a folder containing two BAMs <code>E14_ATAC_RA.bam</code> and <code>E14_ATAC_LIF.bam</code> in a directory <code>mESC/mm10/BAMs</code> (see <a href="#example_data">Example Data</a>), you can specify the input as either:
 
 ```python
-# Specify specific BAMs
-bam_paths = ["path/to/bams/cell_type_A.bam", "path/to/bams/cell_type_B.bam"]
-# Or specify specific bigWigs
-bigwig_paths = ["path/to/bws/cell_type_A.bw", "path/to/bws/cell_type_B.bw"]
+# Specify specific BAMs to process
+bam_paths = ["mESC/mm10/BAMs/E14_ATAC_RA.bam", "mESC/mm10/BAMs/E14_ATAC_LIF.bam"]
 # Or set directory containing BAMs
-bam_directory = "path/to/bams"
-# Or set directory containing bigWigs
-bigwig_directory = "path/to/bws"
+bam_directory = "mESC/mm10/BAMs"
 ```
     
+  </details>
+
+  <details>
+    <summary><b><sub>Click for bigWig Example</sub></b></summary>
+    Say you have a folder containing two bigWigs <code>E14_ATAC_RA.bw</code> and <code>E14_ATAC_LIF.bw</code> in a directory <code>mESC/mm10/bigWigs</code> (see <a href="#example_data">Example Data</a>), you can specify the input as either:
+  
+```python
+# Specify specific bigWigs to process
+bigwig_paths = ["mESC/mm10/bigWigs/E14_ATAC_RA.bw", "mESC/mm10/bigWigs/E14_ATAC_LIF.bw"]
+# Or set directory containing bigWigs
+bigwig_directory = "mESC/mm10/bigWigs"
+```
+
   </details>
 
   <br>
@@ -246,6 +257,7 @@ rev = ReverseNorm(analysis_name = "Analysis", # Set custom output folder name
 rev.reverseNorm(chunk_size = 10000000, chromosomes = ["chr22"])
 ```
 
+<a id="visualising_bigwigs"></a>
 ## Visualising bigWigs
 UCSC Genome browser or Multi Locus View
 
