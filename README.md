@@ -137,22 +137,15 @@ znorm = ZoneNorm(analysis_name = "mESC_Analysis",
 
   Key parameters for this include:
 
-  <details>
-    <summary><b><sub>analysis_name</sub></b></summary>
-    The name of the output folder to save results to.
-  </details>
-  <details>
-    <summary><b><sub>bam_paths, bam_directory, bigwig_paths or bigwig_directory</sub></b></summary>
-    The 
-  </details>
-  <details>
-    <summary><b><sub>n_cores</sub></b></summary>
-    The number of 
-  </details>
-  <details>
-    <summary><b><sub>norm_method</sub></b></summary>
-    Name of the normalisation method to apply. Options include: <code>ZEN</code>
-  </details>
+| Parameter | Usage |
+| -------- | ------- |
+| <code>analysis_name</code> | The name of the output folder to save results to. |
+| <code>bam_paths</code> |  |
+| <code>bam_directory</code> |  |
+| <code>bigwig_directory</code> |  |
+| <code>bam_directory</code> |  |
+| <code>n_cores</code> | The number of  |
+| <code>norm_method</code> | Name of the normalisation method to apply. Options include: <code>ZEN</code> |
 
 </details>
 
