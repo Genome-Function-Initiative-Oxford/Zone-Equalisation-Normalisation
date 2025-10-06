@@ -130,12 +130,13 @@ from ZEN_norm.zone_norm import ZoneNorm
 
 # Create ZoneNorm object
 znorm = ZoneNorm(analysis_name = "mESC_Analysis",
-                 bigwig_paths = ["mESC/mm10/BAMs/E14_ATAC_RA.bam", "mESC/mm10/BAMs/E14_ATAC_LIF.bam"],
+                 bigwig_paths = ["mESC/mm10/bigWigs/E14_ATAC_RA.bw", "mESC/mm10/bigWigs/E14_ATAC_LIF.bw"],
                  n_cores = 4,
                  norm_method = "ZEN")
 ```
 
-  Key parameters for include:
+  <details>
+    <summary open="open"><b><sub>Key parameters</sub></b></summary>
 
 | Parameter | Usage |
 | -------- | ------- |
@@ -147,7 +148,10 @@ znorm = ZoneNorm(analysis_name = "mESC_Analysis",
 | <code>n_cores</code> | The number of  |
 | <code>norm_method</code> | Name of the normalisation method to apply. Options include: <code>ZEN</code> |
 
-Additional parameters:
+  </details>
+
+  <details>
+    <summary open="open"><b><sub>Additional parameters</sub></b></summary>
 
 | Parameter | Usage |
 | -------- | ------- |
@@ -179,6 +183,8 @@ Additional parameters:
 | <code>quality_filter</code> |  |
 | <code>min_different_bps</code> |  |
 | <code>verbose</code> |  |
+
+  </details>
 
 </details>
 
