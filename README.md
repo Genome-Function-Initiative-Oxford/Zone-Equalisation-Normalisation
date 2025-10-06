@@ -63,7 +63,7 @@ For the following tutorial, we demonstrate the features of ZEN-norm using the fo
 <a id=""></a>
 <details open="open">
   <summary><b>Mouse Embryonic Stem Cell ATAC-seq</b></summary>
-  This dataset contains ATAC-seq of E14 mouse embryonic stem cells (mESCs) treated with leukeamia inhibitory factor (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399494">LIF</a>) and retinoic acid (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399495">RA</a>) (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE120376">GSE120376</a>). Two bigWigs for these mapped to the mm10 genome can be downloaded from NCBI GEO using the following commands:
+  This dataset contains ATAC-seq of E14 mouse embryonic stem cells (mESCs) treated with leukemia inhibitory factor (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399494">LIF</a>) and retinoic acid (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399495">RA</a>) (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE120376">GSE120376</a>). Two bigWigs for these mapped to the mm10 genome can be downloaded from NCBI GEO using the following commands:
 
 ```
 wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399495&format=file&file=GSM3399495%5FE14%5FATAC%5FRA%2Ebw" -O E14_ATAC_RA.bw
