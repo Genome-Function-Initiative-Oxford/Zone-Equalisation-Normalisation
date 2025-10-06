@@ -151,13 +151,13 @@ Additional parameters:
 
 | Parameter | Usage |
 | -------- | ------- |
-| <code>chromosomes</code> |  |
-| <code>chrom_sizes_file</code> |  |
-| <code>interleave_sizes</code> |  |
+| <code>chromosomes</code> | List of chromosomes to run analysis on. By default, all autosomal and sex chromosomes will be used. |
+| <code>chrom_sizes_file</code> | Path to file of tab separated chromosomes and sizes for creating bigBed or converting wig to bigWig. |
+| <code>interleave_sizes</code> | If <code>True</code> and using multiple cores, then process larger chromosomes alongside smaller ones to reduce memory usage. Otherwise process chromosomes from largest to smallest. |
 | <code>sample_names</code> |  |
-| <code>blacklist</code> |  |
-| <code>genome_size</code> |  |
-| <code>extend_reads</code> |  |
+| <code>blacklist</code> | File path to blacklist file with chromosome coordinates to exclude. |
+| <code>genome_size</code> | Required if using "RPGC" BAM normalisation. |
+| <code>extend_reads</code> | Whether to enable read extension when creating bigWigs from BAMs with deepTools. |
 | <code>filter_strand</code> |  |
 | <code>exclude_zero</code> |  |
 | <code>zone_remove_percent</code> |  |
