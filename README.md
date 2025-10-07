@@ -403,6 +403,10 @@ norm_compare.MAPlot(norm_method, plot_samples = [], chromosomes = [], n_cols = 4
 
 <a id="reverse_norm"></a>
 ## Reversing Prior bigWig Normalisation
+The module `ReverseNorm` enables raw bigWigs to be created from bigWigs that have previously been normalised. This may be required to avoid double normalisation if renormalising bigWigs with ZEN. 
+
+This works by estimating the coverage value that has been produced by a single read fragment, and dividing signal by this to obtain the coverage that would have been produced has linear normalisation not been applied. 
+
 Sometimes it is not possible or convenient to obtain bigWigs without prior normalisation. For example, if using published data that only provides bigWigs after RPKM normalisation. However, double normalisation will occur if pre-normalised bigWigs are used directly in ZoneNorm. To avoid this, it is best to first reverse normalise pre-normalised bigWigs using ReverseNorm to obtain raw bigWigs.
 
 <br>
@@ -413,8 +417,53 @@ from ZEN_norm.reverse_norm import ReverseNorm
 rev = ReverseNorm(analysis_name = "Analysis", # Set custom output folder name
                         bigwig_paths = inputs, # Specify a list of bigWig paths
                         n_cores = 1) # Set number of cores to use
+```
+
+  <details>
+    <summary open="open"><b><sub>Key Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>analysis_name</code> |  |
+| <code>bigwig_paths</code> |  |
+| <code>bigwig_directory</code> |  |
+| <code>n_cores</code> |  |
+
+  </details>
+
+  <details>
+    <summary open="open"><b><sub>Additional Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>sample_names</code> |  |
+| <code>blacklist</code> |  |
+| <code>verbose</code> |  |
+
+  </details>
+
+```python
 rev.reverseNorm(chunk_size = 10000000, chromosomes = ["chr22"])
 ```
+
+  <details>
+    <summary open="open"><b><sub>Key Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>chromosomes</code> |  |
+
+  </details>
+
+  <details>
+    <summary open="open"><b><sub>Additional Parameters</sub></b></summary>
+
+| Parameter | Usage |
+| -------- | ------- |
+| <code>chunk_size</code> |  |
+| <code>replace_existing</code> |  |
+
+  </details>
 
 <a id="visualising_bigwigs"></a>
 ## Visualising bigWigs
