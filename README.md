@@ -323,7 +323,7 @@ norm_compare = NormCompare(bigwig_df = bw_df,
                            min_peak_score = 0.5,
                            min_consensus = 1,
                            n_cores = znorm.n_cores,
-                           analysis_name = = "Analysis_Name",
+                           analysis_name = "Analysis_Name",
                            verbose = 2)
 ```
   
