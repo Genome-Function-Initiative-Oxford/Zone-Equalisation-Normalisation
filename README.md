@@ -72,6 +72,12 @@ wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399495&format=file&file
 wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file=GSM3399494%5FE14%5FATAC%5FLIF%2Ebw" -O E14_ATAC_LIF.bw
 ```
 
+Download all BAMs
+
+```
+wget -i tests/data/Erythroid_ATAC_BAM_URLs.txt
+```
+
 </details>
 
 <br>
