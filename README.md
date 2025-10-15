@@ -72,10 +72,52 @@ wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399495&format=file&file
 wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file=GSM3399494%5FE14%5FATAC%5FLIF%2Ebw" -O E14_ATAC_LIF.bw
 ```
 
-Download all BAMs
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Erythroid ATAC-seq</b></summary>
+
+  Download all BAMs
 
 ```
 wget -i tests/data/Erythroid_ATAC_BAM_URLs.txt
+```
+
+```
+wget -i tests/data/Erythroid_ATAC_bigWig_URLs.txt
+```
+
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Erythroid RAD21 ChIP-seq</b></summary>
+
+  Download all BAMs
+
+```
+wget -i tests/data/Erythroid_RAD21_BAM_URLs.txt
+```
+
+```
+wget -i tests/data/Erythroid_RAD21_bigWig_URLs.txt
+```
+
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>HeLa TT-seq</b></summary>
+
+  Download all BAMs
+
+```
+wget -i tests/data/HeLa_TTseq_BAM_URLs.txt
+```
+
+```
+wget -i tests/data/HeLa_TTseq_bigWig_URLs.txt
 ```
 
 </details>
