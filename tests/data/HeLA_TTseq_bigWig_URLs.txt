@@ -1,0 +1,12 @@
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep1_Pos.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep1_Neg.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep2_Pos.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep2_Neg.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep3_Pos.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep3_Neg.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep1_Pos.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep1_Neg.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep2_Pos.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep2_Neg.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep3_Pos.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/TT-seq_Raw/HeLa_TTseq_U1AMO_Rep3_Neg.bw

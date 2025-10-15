@@ -1,0 +1,6 @@
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/BAMs/HeLa_TTseq_U1AMO_Rep1.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/BAMs/HeLa_TTseq_U1AMO_Rep2.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/BAMs/HeLa_TTseq_U1AMO_Rep3.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/BAMs/HeLa_TTseq_U1AMO_Rep1.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/BAMs/HeLa_TTseq_U1AMO_Rep2.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Cervical_Carcinoma/HeLa_TT-seq_A_Fiszbein_2024/hg38/BAMs/HeLa_TTseq_U1AMO_Rep3.bam

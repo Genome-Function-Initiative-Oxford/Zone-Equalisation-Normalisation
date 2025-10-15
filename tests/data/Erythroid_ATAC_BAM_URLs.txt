@@ -1,0 +1,14 @@
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don002_ATAC_d13_rep1.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don002_ATAC_d13_rep2.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don002_ATAC_d13_rep3.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don002_ATAC_d13_rep4.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don002_ATAC_d13_rep5.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don002_ATAC_d13_rep6.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don002_ATAC_d13_rep7.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don003_ATAC_d13_rep1.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don003_ATAC_d13_rep2.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don003_ATAC_d13_rep3.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don003_ATAC_d13_rep4.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don003_ATAC_d13_rep5.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don003_ATAC_d13_rep6.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/Unpublished/ATAC/Replicates/BAMs/Don003_ATAC_d13_rep7.bam

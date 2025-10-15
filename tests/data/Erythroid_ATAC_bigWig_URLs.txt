@@ -1,0 +1,8 @@
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/E_Georgiades_2025/RAD21/Raw/Don001_RAD21_d13_rep1.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/E_Georgiades_2025/RAD21/Raw/Don001_RAD21_d13_rep2.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/E_Georgiades_2025/RAD21/Raw/Don001_RAD21_d13_rep3.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/E_Georgiades_2025/RAD21/Raw/Don002_RAD21_d13_rep1.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/E_Georgiades_2025/RAD21/Raw/Don002_RAD21_d13_rep2.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/E_Georgiades_2025/RAD21/Raw/Don002_RAD21_d13_rep3.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/E_Georgiades_2025/RAD21/Raw/Don030_RAD21_d13_rep1.bw
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Erythroid/50_Donors_Erythroid/hg38/E_Georgiades_2025/RAD21/Raw/Don030_RAD21_d13_rep3.bw
