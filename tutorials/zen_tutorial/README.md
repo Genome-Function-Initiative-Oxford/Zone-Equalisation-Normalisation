@@ -1,11 +1,11 @@
 # ZEN Tutorial
 
 ## About
-The <a href="">ZEN Tutorial</a> notebook 
+The <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/main/tutorials/zen_tutorial/ZEN_Tutorial.ipynb">ZEN Tutorial</a> notebook contains detailed explainations for running bigWig normalisation with ZEN with module `ZoneNorm`, reversing prior bigWig normalisation with `ReverseNorm` and comparing performance of normalisation methods genome-wide with `CompareNorm`. Examples are given across a range of genomic assays using the datasets below.
 
 <a id="example_data"></a>
 ## Example Data
-In the <a href="">ZEN Tutorial</a> notebook, the features of ZEN-norm are demonstrated using the following publically avaliable data. Files of URLs can be found on this repository under <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tests/data">tests/data</a>.
+The following datasets are all publically avaliable and files of URLs can be found in this repository under <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/data">data</a>.
 
 <a id=""></a>
 <details open="open">
@@ -15,12 +15,12 @@ In the <a href="">ZEN Tutorial</a> notebook, the features of ZEN-norm are demons
   <br>
   
 
-  <ins>Download BAMs</ins>
+  <ins>Download BAMs Command</ins>
 ```
 wget -i tests/data/Erythroid_ATAC_BAM_URLs.txt
 ```
 
-  <ins>Download Non-Normalised bigWigs</ins>
+  <ins>Download Non-Normalised bigWigs Command</ins>
 ```
 wget -i tests/data/Erythroid_ATAC_bigWig_URLs.txt
 ```
@@ -32,12 +32,12 @@ wget -i tests/data/Erythroid_ATAC_bigWig_URLs.txt
   <summary><b>Erythroid RAD21 ChIP-seq</b></summary>
   This data by E. Georgiades et al (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE244929">GSE244929</a>) consists of RAD21 ChIP-seq from three healthy day 13 erythroid donors (donors 1, 2, and 30), each with three replicates. Either BAMs, or non-normalised bigWigs (as used in the tutorial) can be downloaded by command line:
 
-  <ins>Download BAMs</ins>
+  <ins>Download BAMs Command</ins>
 ```
 wget -i tests/data/Erythroid_RAD21_BAM_URLs.txt
 ```
 
-  <ins>Download Non-Normalised bigWigs</ins>
+  <ins>Download Non-Normalised bigWigs Command</ins>
 ```
 wget -i tests/data/Erythroid_RAD21_bigWig_URLs.txt
 ```
@@ -49,12 +49,12 @@ wget -i tests/data/Erythroid_RAD21_bigWig_URLs.txt
   <summary><b>HeLa TT-seq</b></summary>
   This data by A. Fiszbein et al. (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE284682">GSE284682</a>) contains TT-seq from HeLa cells treated with either U1-AMO or a control, each with two replicates. Either BAMs (as used in the tutorial), or non-normalised bigWigs split into forward (positive) and reverse (negative) strands can be downloaded by command line:
 
-  <ins>Download BAMs</ins>
+  <ins>Download BAMs Command</ins>
 ```
 wget -i tests/data/HeLa_TTseq_BAM_URLs.txt
 ```
 
-  <ins>Download Non-Normalised bigWigs</ins>
+  <ins>Download Non-Normalised bigWigs Command</ins>
 ```
 wget -i tests/data/HeLa_TTseq_bigWig_URLs.txt
 ```
@@ -74,4 +74,5 @@ wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file
 ```
 
 </details>
+
 
