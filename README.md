@@ -59,12 +59,12 @@ conda install zen-norm
 <a id="example_data"></a>
 ## Example Data
 ### ZEN Tutorial
-In the <a href="">ZEN Tutorial</a>, we demonstrate the features of ZEN-norm using the following publically avaliable data. Files of URLs can be found on this repository under <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tests/data">tests/data</a>.
+In the <a href="">ZEN Tutorial</a> notebook, we demonstrate the features of ZEN-norm using the following publically avaliable data. Files of URLs can be found on this repository under <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tests/data">tests/data</a>.
 
 <a id=""></a>
 <details open="open">
   <summary><b>Erythroid ATAC-seq</b></summary>
-  The erythroid ATAC-seq data consists of bulk ATAC-seq from two healthy day 13 erythroid donors (donors 2 and 3), each with seven technical replicates. Either BAMs (as used in the tutorial), or non-normalised bigWigs can be downloaded by command line:
+  This data consists of bulk ATAC-seq from two healthy day 13 erythroid donors (donors 2 and 3), each with seven technical replicates. Either BAMs (as used in the tutorial), or non-normalised bigWigs can be downloaded by command line:
 
   <br>
   
@@ -132,8 +132,49 @@ wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file
 <br>
 
 ### Supplementary Data
+Here additional data for creating figures in the <a href="">Supplementary Figures</a> notebook is outlined. For these datasets (except CATlas), BAMs can be created by downloaded FASTQ from NCBI GEO and aligning them to the hg38 genome using the <a href="https://github.com/Genome-Function-Initiative-Oxford/UpStreamPipeline/tree/main/genetics/CATCH-UP">CATCH-UP pipeline</a>.
 
+<a id=""></a>
+<details open="open">
+  <summary><b>H1 Brain ATAC-seq</b></summary>
+  This data 
 
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>CATlas scATAC-seq</b></summary>
+  This data 
+
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Erythroid CTCF ChIP-seq</b></summary>
+  This data 
+
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>HEL Pol II ChIP-seq</b></summary>
+  This data 
+
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>A-375 TT-seq</b></summary>
+  This data 
+
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>HEK293T TT-seq</b></summary>
+  This data 
+
+</details>
 ---
 
 <a id="zen_norm"></a>
