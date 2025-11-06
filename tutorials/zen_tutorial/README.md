@@ -1,5 +1,8 @@
 # ZEN Tutorial
 
+## About
+The <a href="">ZEN Tutorial</a> notebook 
+
 <a id="example_data"></a>
 ## Example Data
 In the <a href="">ZEN Tutorial</a> notebook, the features of ZEN-norm are demonstrated using the following publically avaliable data. Files of URLs can be found on this repository under <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tests/data">tests/data</a>.
@@ -71,3 +74,4 @@ wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file
 ```
 
 </details>
+
