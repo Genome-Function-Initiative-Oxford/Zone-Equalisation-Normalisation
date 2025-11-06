@@ -25,6 +25,8 @@ wget -i tests/data/Erythroid_ATAC_BAM_URLs.txt
 wget -i tests/data/Erythroid_ATAC_bigWig_URLs.txt
 ```
 
+<br>
+
 </details>
 
 <a id=""></a>
@@ -42,6 +44,8 @@ wget -i tests/data/Erythroid_RAD21_BAM_URLs.txt
 wget -i tests/data/Erythroid_RAD21_bigWig_URLs.txt
 ```
 
+<br>
+
 </details>
 
 <a id=""></a>
@@ -58,6 +62,8 @@ wget -i tests/data/HeLa_TTseq_BAM_URLs.txt
 ```
 wget -i tests/data/HeLa_TTseq_bigWig_URLs.txt
 ```
+
+<br>
 
 </details>
 
@@ -78,6 +84,7 @@ wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file
 ```
 
 </details>
+
 
 
 
