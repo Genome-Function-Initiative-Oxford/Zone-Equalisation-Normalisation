@@ -135,42 +135,42 @@ wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file
 Here additional data for creating figures in the <a href="">Supplementary Figures</a> notebook is outlined. For these datasets (except CATlas), BAMs can be created by downloaded FASTQ from NCBI GEO and aligning them to the hg38 genome using the <a href="https://github.com/Genome-Function-Initiative-Oxford/UpStreamPipeline/tree/main/genetics/CATCH-UP">CATCH-UP pipeline</a>.
 
 <a id=""></a>
-<details open="open">
+<details>
   <summary><b>H1 Brain ATAC-seq</b></summary>
-  This data 
+  
 
 </details>
 
 <a id=""></a>
-<details open="open">
-  <summary><b>CATlas scATAC-seq</b></summary>
-  This data 
-
+<details>
+  <summary><b>CATlas Single-Cell ATAC-seq</b></summary>
+  222 scATAC-seq bigWigs from human tissues can be downloaded from the <a href="https://decoder-genetics.wustl.edu/catlasv1/catlas_downloads/humantissues/Bigwig/">CATlas portal</a>.
+  
 </details>
 
 <a id=""></a>
-<details open="open">
+<details>
   <summary><b>Erythroid CTCF ChIP-seq</b></summary>
   This data 
 
 </details>
 
 <a id=""></a>
-<details open="open">
+<details>
   <summary><b>HEL Pol II ChIP-seq</b></summary>
   This data 
 
 </details>
 
 <a id=""></a>
-<details open="open">
+<details>
   <summary><b>A-375 TT-seq</b></summary>
   This data 
 
 </details>
 
 <a id=""></a>
-<details open="open">
+<details>
   <summary><b>HEK293T TT-seq</b></summary>
   This data 
 
