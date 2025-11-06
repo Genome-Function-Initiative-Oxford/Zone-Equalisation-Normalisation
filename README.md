@@ -10,10 +10,9 @@ ZEN-norm is a Python package for normalising bigWigs of genomic signal, such as 
   <summary><b>Contents</b></summary>
   <ol>
     <li><a href="#installation">Installation</a></li>
-    <li><a href="#zen_norm">ZEN bigWig Normalisation</a></li>
-    <li><a href="#norm_compare">Plots for Evaluating Normalisation Method Performance</a></li>
     <li><a href="#reverse_norm">Reversing Prior bigWig Normalisation</a></li>
-    <li><a href="#visualising_bigwigs">Visualising bigWigs</a></li>
+    <li><a href="#zen_norm">Normalising bigWigs With ZEN</a></li>
+    <li><a href="#norm_compare">Evaluating Normalisation Method Performance</a></li>
   </ol>
 </details>
 
@@ -57,52 +56,6 @@ conda install zen-norm
 ---
 
 <br>
-
-### Supplementary Data
-Here additional data for creating figures in the <a href="">Supplementary Figures</a> notebook is outlined. For these datasets (except CATlas), BAMs can be created by downloaded FASTQ from NCBI GEO and aligning them to the hg38 genome using the <a href="https://github.com/Genome-Function-Initiative-Oxford/UpStreamPipeline/tree/main/genetics/CATCH-UP">CATCH-UP pipeline</a>.
-
-<a id=""></a>
-<details>
-  <summary><b>H1 Brain ATAC-seq</b></summary>
-  
-
-</details>
-
-<a id=""></a>
-<details>
-  <summary><b>CATlas Single-Cell ATAC-seq</b></summary>
-  222 scATAC-seq bigWigs from human tissues can be downloaded from the <a href="https://decoder-genetics.wustl.edu/catlasv1/catlas_downloads/humantissues/Bigwig/">CATlas portal</a>.
-  
-</details>
-
-<a id=""></a>
-<details>
-  <summary><b>Erythroid CTCF ChIP-seq</b></summary>
-  This data 
-
-</details>
-
-<a id=""></a>
-<details>
-  <summary><b>HEL Pol II ChIP-seq</b></summary>
-  This data 
-
-</details>
-
-<a id=""></a>
-<details>
-  <summary><b>A-375 TT-seq</b></summary>
-  This data 
-
-</details>
-
-<a id=""></a>
-<details>
-  <summary><b>HEK293T TT-seq</b></summary>
-  This data 
-
-</details>
----
 
 <a id="zen_norm"></a>
 ## ZEN bigWig Normalisation
