@@ -59,18 +59,22 @@ conda install zen-norm
 <a id="example_data"></a>
 ## Example Data
 ### ZEN Tutorial
-In the <a href="">ZEN Tutorial</a>, we demonstrate the features of ZEN-norm using the following publically avaliable data:
+In the <a href="">ZEN Tutorial</a>, we demonstrate the features of ZEN-norm using the following publically avaliable data. Files of URLs can be found on this repository under <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tests/data">tests/data</a>.
 
 <a id=""></a>
 <details open="open">
   <summary><b>Erythroid ATAC-seq</b></summary>
+  The erythroid ATAC-seq data consists of bulk ATAC-seq from two healthy day 13 erythroid donors (donors 2 and 3), each with seven technical replicates. Either BAMs (as used in the tutorial), or non-normalised bigWigs can be downloaded by command line:
 
-  Download all BAMs
+  <br>
+  
 
+  <ins>Download BAMs</ins>
 ```
 wget -i tests/data/Erythroid_ATAC_BAM_URLs.txt
 ```
 
+  <ins>Download Non-Normalised bigWigs</ins>
 ```
 wget -i tests/data/Erythroid_ATAC_bigWig_URLs.txt
 ```
@@ -83,10 +87,12 @@ wget -i tests/data/Erythroid_ATAC_bigWig_URLs.txt
 
   Download all BAMs
 
+  <ins>Download BAMs</ins>
 ```
 wget -i tests/data/Erythroid_RAD21_BAM_URLs.txt
 ```
 
+  <ins>Download Non-Normalised bigWigs</ins>
 ```
 wget -i tests/data/Erythroid_RAD21_bigWig_URLs.txt
 ```
@@ -99,10 +105,12 @@ wget -i tests/data/Erythroid_RAD21_bigWig_URLs.txt
 
   Download all BAMs
 
+  <ins>Download BAMs</ins>
 ```
 wget -i tests/data/HeLa_TTseq_BAM_URLs.txt
 ```
 
+  <ins>Download Non-Normalised bigWigs</ins>
 ```
 wget -i tests/data/HeLa_TTseq_bigWig_URLs.txt
 ```
