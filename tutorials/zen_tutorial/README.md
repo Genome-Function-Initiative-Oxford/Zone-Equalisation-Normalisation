@@ -1,7 +1,7 @@
 # ZEN Tutorial
 
 ## About
-The <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/main/tutorials/zen_tutorial/ZEN_Tutorial.ipynb">ZEN Tutorial</a> notebook contains detailed explainations for running bigWig normalisation with ZEN with module `ZoneNorm`, reversing prior bigWig normalisation with `ReverseNorm` and comparing performance of normalisation methods genome-wide with `CompareNorm`. Examples are given across a range of genomic assays using the datasets below.
+<a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/main/tutorials/zen_tutorial/ZEN_Tutorial.ipynb">ZEN_Tutorial.ipynb</a> is a Jupyter notebook with detailed explainations for running bigWig normalisation with ZEN with module `ZoneNorm`, reversing prior bigWig normalisation with `ReverseNorm` and comparing performance of normalisation methods genome-wide with `CompareNorm`. Examples are given across a range of genomic assays using the datasets below.
 
 <a id="example_data"></a>
 ## Example Data
@@ -84,6 +84,7 @@ wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file
 ```
 
 </details>
+
 
 
 
