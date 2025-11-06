@@ -1,0 +1,6 @@
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Melanoma/A-375ML_Insco_2023/hg38/BAMs/A375_TTseq_Control_Rep1.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Melanoma/A-375ML_Insco_2023/hg38/BAMs/A375_TTseq_Control_Rep2.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Melanoma/A-375ML_Insco_2023/hg38/BAMs/A375_TTseq_Control_Rep3.bam
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Melanoma/A-375ML_Insco_2023/hg38/BAMs/A375_TTseq_CDK13_R860Q_Rep1
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Melanoma/A-375ML_Insco_2023/hg38/BAMs/A375_TTseq_CDK13_R860Q_Rep2
+https://datashare.molbiol.ox.ac.uk/public/project/Wellcome_Discovery/towilson/Trackhubs/Human/Melanoma/A-375ML_Insco_2023/hg38/BAMs/A375_TTseq_CDK13_R860Q_Rep3

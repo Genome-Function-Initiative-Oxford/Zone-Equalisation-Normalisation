@@ -12,7 +12,7 @@ import subprocess
 import sympy as sp
 from scipy.special import expi
 from scipy import stats
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 from .chrom_analysis import ChromAnalysisExtended
 
 #####################################
@@ -49,7 +49,7 @@ class ZoneNorm(ChromAnalysisExtended):
                            "gumbel_r": stats.gumbel_r}
 
     # By default, only test subset of recommended distributions
-    default_test_distributions = ["norm", "laplace", "logistic"]
+    default_test_distributions = ["laplace"]
 
     # Use these column names in region_coords for consistency
     region_coords_cols = ["chrom", "start", "end"]
@@ -60,10 +60,9 @@ class ZoneNorm(ChromAnalysisExtended):
                  "test_distributions", "log_transform", "zone_distribution", "zone_param_type", 
                  "best_zone_distribution", "zone_probability", "bin_size", "extend_n_bins", 
                  "merge_depth", "min_region_bps", "quality_filter", "min_different_bps")
-    def __init__(self, bam_paths = [], bam_directory = "", bigwig_paths = [], bigwig_directory = "",
-                 chromosomes = [], chrom_sizes_file = None, interleave_sizes = True,
-                 sample_names = [], blacklist = "", norm_method = "", genome_size = None, 
-                 extend_reads = None, filter_strand = False, exclude_zero = True, 
+    def __init__(self, bam_paths = [], bigwig_paths = [], chromosomes = [], chrom_sizes_file = None, 
+                 interleave_sizes = True, sample_names = [], blacklist = "", norm_method = "ZEN", 
+                 genome_size = None, extend_reads = False, filter_strand = False, exclude_zero = True, 
                  zone_remove_percent = 10, norm_stats_type = "signal_padded_sample_zones",
                  norm_power = None, deletion_size = 500, downsample_size = 300, downsample_seed = 0,
                  kernel = [], test_distributions = ["laplace"], log_transform = True, 
@@ -76,13 +75,8 @@ class ZoneNorm(ChromAnalysisExtended):
 
         params:
             bam_paths:           List of paths of BAM files of interest. This takes priority over 
-                                 bam_directory, bigwig_paths and bigwig_directory.
-            bam_directory:       Directory containing the BAM files of interest. This takes priority 
-                                 over bigwig_paths and bigwig_directory.
-            bigwig_paths:        List of paths of bigWig and/or wig files of interest. This takes
-                                 priority over bigwig_directory.
-            bigwig_directory:    Directory containing the bigWig and/or wig files of interest. This is
-                                 required if neither bam_paths, bam_directory or bigwig_paths are set.
+                                 bigwig_paths.
+            bigwig_paths:        List of paths of bigWig and/or wig files of interest.
             chromosomes:         List of chromosomes to run analysis on.
             chrom_sizes_file:    Path to file of tab separated chromosomes and sizes for creating 
                                  bigBed or converting wig to bigWig.
@@ -99,7 +93,10 @@ class ZoneNorm(ChromAnalysisExtended):
             blacklist:           File path to blacklist file with chromosome coordinates to exclude.
             norm_method:         Signal Normalisation method to apply, i.e. "ZEN", "Power", "Log", 
                                  "No normalisation" (bigWig/BAM) or "RPKM", "CPM", "BPM", "RPGC" (BAM).
-            genome_size:         Required if using "RPGC" BAM normalisation.
+            genome_size:         Required if using "RPGC" BAM normalisation. Can be set as either an 
+                                 integer, or "hg19", "grch37", "hg38", "grch38", "t2t", "chm13cat_v2",
+                                 "mm9", "grcm37", "mm10", "grcm38", "mm39", "grcm39", "dm3", "dm6",
+                                 "danrer10":, "grcz10", "danrer11", "grcz11", "wbcel235" or "tair10".
             extend_reads:        Whether to enable read extension when creating bigWigs from BAMs with 
                                  deepTools.
             filter_strand:       Specifies whether to separated reads by strand when creating bigWigs 
@@ -170,9 +167,7 @@ class ZoneNorm(ChromAnalysisExtended):
 
         # Initialise the parent class
         super().__init__(bam_paths = bam_paths,
-                         bam_directory = bam_directory,
                          bigwig_paths = bigwig_paths,
-                         bigwig_directory = bigwig_directory,
                          allow_bams = True, # Allow bigWig, wig or BAM files to be input
                          sample_names = sample_names,
                          blacklist = blacklist,
@@ -238,6 +233,55 @@ class ZoneNorm(ChromAnalysisExtended):
             
         self.setChromAttributes(chromosomes)
 
+
+    def __str__(self):
+        """ 
+        Format parameters in user readable way when print is called on an object.
+        """
+
+        n_chroms = len(self.chromosomes)
+        if n_chroms == 0:
+            chrom_msg = "Chromosomes: Not yet set"
+        elif n_chroms == 1:
+            chrom_msg = f"1 chromosome: {self.chromosomes[0]}"
+        else:
+            chrom_msg = f"{n_chroms} chromosome(s): {', '.join(self.chromosomes)}"
+
+        kernel_size = len(self.kernel)
+        if np.all(self.kernel == self.createTriangleKernel(size = kernel_size)):
+            kernel_msg = f"Triangle kernel of size {kernel_size}"
+        else:
+            kernel_msg = f"Custom kernel of size {kernel_size}"
+
+        if self.blacklist is None:
+            blacklist_msg = "Not set"
+        else:
+            blacklist_msg = self.blacklist
+
+        dist_msg = f"{self.zone_distribution.title()} with {self.zone_param_type.replace('_', ' ')}, "
+        dist_msg += f"parameter type"
+
+        if self.verbose >= 0:
+            verbose_msg = "(silent)"
+        elif self.verbose == 1:
+            verbose_msg = "(active)"
+        else:
+            verbose_msg = "(debugging mode)"
+
+        message = (f'{self.__class__.__name__} object for "{self.analysis_name}"\n'
+                   f"   * Output directory: {self.getOutputDirectory()}\n"
+                   f"   * {chrom_msg}\n"
+                   f"   * Number of samples: {len(self.sample_ids)}\n"
+                   f"   * Sample names: {', '.join(self.sample_names.values())}\n"
+                   f"   * Blacklist: {blacklist_msg}\n"
+                   f"   * Kernel: {kernel_msg}\n"
+                   f"   * Test distributions: {', '.join(self.test_distributions).title().replace('_', ' ')}\n"
+                   f"   * Set distribution: {dist_msg}\n"
+                   f"   * Zone probabilty: {self.zone_probability}\n"
+                   f"   * Resources: {self.n_cores} cores\n"
+                   f"   * Verbose: {self.verbose} {verbose_msg}")
+
+        return message
 
     def setInterleaveSizes(self, interleave_sizes):
         try:
@@ -392,7 +436,7 @@ class ZoneNorm(ChromAnalysisExtended):
         except:
             raise ValueError("deletion_size must be set as an integer between 10 and 10000")
 
-    def setKernel(self, kernel):
+    def setKernel(self, kernel = []):
         try:
             # Allow no kernel to be used
             if kernel is not None:
@@ -418,7 +462,7 @@ class ZoneNorm(ChromAnalysisExtended):
 
         # Convert to list if not already
         test_distributions = list(test_distributions)
-        supported_distributions = list(self.scipy_distributions.keys())
+        supported_distributions = self.getSupportedDistributions()
 
         if len(test_distributions) > 0:
             # Check if given distributions are supported
@@ -466,21 +510,25 @@ class ZoneNorm(ChromAnalysisExtended):
             raise ValueError("downsample_seed must be set as an integer")
 
     def setZoneDistribution(self, zone_distribution):
-        if zone_distribution in self.test_distributions:
+        supported_dists = self.getSupportedDistributions()
+
+        if zone_distribution in supported_dists:
             self.zone_distribution = zone_distribution
         else:
             zone_distribution = zone_distribution.lower()
             if zone_distribution in ["best", "infer"]:
                 self.zone_distribution = "infer"
             else:
-                zone_distibution_error = 'zone_distribution must be set as either "infer" '
-                zone_distibution_error += "or the name of a distribution in test_distributions."
-                zone_distibution_error += "\nCurrent options include: "
-                zone_distibution_error += ", ".join(list(self.scipy_distributions.keys()))
                 raise ValueError(f'zone_distribution must be set as either "infer" '
                                  f"or the name of a distribution in test_distributions.\n"
                                  f"Current options include: ",
-                                 f"{', '.join(list(self.scipy_distributions.keys()))}")
+                                 f"{', '.join(supported_dists)}")
+
+        if zone_distribution not in self.test_distributions:
+            if self.verbose > 0:
+                print(f"Adding {zone_distribution} to test distributions")
+
+            self.test_distributions.append(zone_distribution)
 
     def setZoneParamType(self, zone_param_type):
         zone_param_type = zone_param_type.lower().removesuffix("_fit")
@@ -570,7 +618,7 @@ class ZoneNorm(ChromAnalysisExtended):
 
         # Set the bamCoverage command
         command = f"bamCoverage -b {bam_file} -o {bigwig_file} -bs {bin_size} "
-        command += "--numberOfProcessors {subprocess_cores}"
+        command += f"--numberOfProcessors {subprocess_cores}"
 
         # Add additional parameters
         if extend_reads:
@@ -829,7 +877,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                               file_prefix = file_prefix)[1]
         except Exception as e:
             if self.verbose > 0:
-                sample_name = list(self.sample_names.values())[bw_idx]
+                sample_name = self.getSampleNames(return_custom = True)[bw_idx]
                 print(f"Warning: {signal_type} signal not found for {chromosome} {sample_name} "
                       f"due to exception:\n{e}")
                 
@@ -849,12 +897,33 @@ class ZoneNorm(ChromAnalysisExtended):
         left_size = np.ceil(size / 2)
         right_size = np.floor(size / 2)
 
-        kernel = np.concatenate((np.arange(1, left_size), 
-                                 np.flip(np.arange(1, right_size)))).astype(np.float32)
+        kernel = np.concatenate((np.arange(1, left_size + 1), 
+                                 np.flip(np.arange(1, right_size + 1)))).astype(np.float32)
         kernel = kernel / np.sum(kernel)
 
         return kernel
-    
+
+    def getTestDistributions(self):
+        """
+        Returns distributions set to test for separating signal from background.
+        """
+        return self.test_distributions
+
+    @classmethod
+    def getSupportedDistributions(cls):
+        """
+        Return a list of distributions that can be used for signal zone prediction.
+        """
+
+        return list(cls.scipy_distributions.keys())
+
+    def getZoneProbability(self):
+        """
+        Returns the set zone probability.
+        """
+
+        return self.zone_probability
+
     def getBlacklist(self, blacklist_file = None, chromosome = None):
         """ 
         Opens the blacklist regions and returns them as a DataFrame.
@@ -882,13 +951,12 @@ class ZoneNorm(ChromAnalysisExtended):
 
         return blacklist_df
 
-    def getSignalStats(self, stats_type = "signal", file_name = "", lock = None, 
-                       replace_existing = False):
+    def getStats(self, stats_type, file_name = "", lock = None, replace_existing = False):
         """
         Read statistics about the signal or distribution fitting from CSV.
         
         params:
-            stats_type:       Get either 'signal' or 'distribution' statistics.
+            stats_type:       Either 'signal' or 'distribution' statistics.
             file_name:        If provided, read directly from a file.
             lock:             Can be set as a threading/multiprocessing lock to prevent 
                               parallel access to the signal statistics.
@@ -896,10 +964,13 @@ class ZoneNorm(ChromAnalysisExtended):
         """
 
         stats_type = stats_type.lower()
-    
+        get_mean_stats = False
+
         if stats_type.startswith("s"):
             stats_type = "signal"
         elif stats_type.startswith("d"):
+            if stats_type.endswith("mean"):
+                get_mean_stats = True
             stats_type = "distribution"
         else:
             raise ValueError('stats_type must be set as either "signal" or "distribution"')
@@ -910,9 +981,14 @@ class ZoneNorm(ChromAnalysisExtended):
                 file_name = os.path.join(self.output_directories["output_stats"],
                                          "combined-signal-stats.csv")
             else:
-                # Set file as combined distribution statistics
-                file_name = os.path.join(self.output_directories["output_stats"],
-                                         "combined-distribution-stats.csv")
+                if get_mean_stats:
+                    # Set file as combined distribution statistics
+                    file_name = os.path.join(self.output_directories["output_stats"],
+                                             "mean-distribution-stats.csv")
+                else:
+                    # Set file as combined distribution statistics
+                    file_name = os.path.join(self.output_directories["output_stats"],
+                                             "combined-distribution-stats.csv")
 
         if not replace_existing and os.path.isfile(file_name):
             if lock is not None:
@@ -922,19 +998,63 @@ class ZoneNorm(ChromAnalysisExtended):
             else:
                 stats_df = pd.read_csv(file_name)
 
-            # Ensure chromosome column is correct type
-            stats_df["chrom"] = stats_df["chrom"].astype(str)
+            if not get_mean_stats:
+                # Ensure chromosome column is correct type
+                stats_df["chrom"] = stats_df["chrom"].astype(str)
                 
             if not stats_df.empty:
                 return stats_df
 
         # Create the statistics
-        stats_df = self.combineStats(stats_type = stats_type, file_name = file_name, return_df = True)
+        if get_mean_stats:
+            self.inferBestDistribution()
+            if not os.path.exists(file_name):
+                raise ValueError(f'Cannot find mean distribution statistics file "{file_name}"')
 
-        stats_df["chrom"] = stats_df["chrom"].astype(str)
+            # Get average statistics
+            stats_df = pd.read_csv(file_name)
+            
+        else:
+            # Get statistics per sample
+            stats_df = self.combineStats(stats_type = stats_type, file_name = file_name, return_df = True)
+            stats_df["chrom"] = stats_df["chrom"].astype(str)
 
         return stats_df
     
+    def getSignalStats(self, file_name = "", lock = None, replace_existing = False):
+        """
+        Read signal statistics from CSV.
+
+        params:
+            file_name:        If provided, read directly from a file.
+            lock:             Can be set as a threading/multiprocessing lock to prevent 
+                              parallel access to the signal statistics.
+            replace_existing: Whether to overwrite previously created files.
+        """
+
+        return self.getStats(stats_type = "signal", file_name = file_name, lock = lock, 
+                             replace_existing = replace_existing)
+
+    def getDistributionStats(self, file_name = "", get_mean_stats = False, lock = None, 
+                             replace_existing = False):
+        """
+        Read distribution fitting statistics from CSV.
+
+        params:
+            file_name:        If provided, read directly from a file.
+            lock:             Can be set as a threading/multiprocessing lock to prevent 
+                              parallel access to the signal statistics.
+            get_mean_stats:   
+            replace_existing: Whether to overwrite previously created files.
+        """
+
+        if get_mean_stats:
+            return self.getStats(stats_type = "distribution_mean", file_name = file_name, lock = lock, 
+                                 replace_existing = replace_existing)
+        else:
+            return self.getStats(stats_type = "distribution", file_name = file_name, lock = lock, 
+                                 replace_existing = replace_existing)
+
     def getChromFragMean(self, chromosome, sample_ids = [], signal_type = "signal_non_zero", 
                          file_name = ""):
         """
@@ -954,10 +1074,10 @@ class ZoneNorm(ChromAnalysisExtended):
             sample_ids = self.sample_ids
 
         # Convert from sample ID to name
-        sample_names = np.array(list(self.sample_names.keys()))[sample_ids]
+        sample_names = np.array(self.getSampleNames(return_custom = True))[sample_ids]
 
         # Open the combined statistics calculated for the signal
-        stats_df = self.getSignalStats(stats_type = "signal", file_name = file_name)
+        stats_df = self.getSignalStats(file_name = file_name)
 
         for column in ["sample", "chrom", "signal_type", "mean"]:
             if column not in stats_df.columns:
@@ -969,8 +1089,7 @@ class ZoneNorm(ChromAnalysisExtended):
 
         if len(stats_df) == 0:
             # Force recreation of file if missing rows
-            stats_df = self.getSignalStats(stats_type = "signal", file_name = file_name, 
-                                           replace_existing = True)
+            stats_df = self.getSignalStats(file_name = file_name, replace_existing = True)
             stats_df = stats_df.loc[(stats_df["signal_type"] == signal_type) &
                                     (stats_df["sample"].isin(sample_names))]
             
@@ -1018,6 +1137,98 @@ class ZoneNorm(ChromAnalysisExtended):
 
         return chrom_fragments, chrom_means, global_means
 
+    def getOriginalSignal(self, sample, chromosome):
+        """
+        Read original bigWig signal for a specific sample and chromsome into an array.
+
+        params:
+            sample_name: Name of sample to get signal for.
+            chromosome: Chromosome to get signal for.
+        """
+
+        custom_sample_names = np.array(self.getSampleNames(return_custom = True))
+
+        if isinstance(sample, str):
+            bw_idx = self.sampleToIndex(sample)
+        elif isinstance(sample, (int, np.integer)):
+            bw_idx = sample
+            sample = custom_sample_names[bw_idx]
+        else:
+            raise ValueError("Invalid type for sample")
+
+        if self.verbose > 0:
+            print(f"Reading {chromosome}:0-{self.chrom_sizes[chromosome]} for {sample}")
+
+        # Read whole chromosome signal from bigWig
+        signal = self.signalReader(bw_idx = bw_idx,
+                                   start_idx = 0,
+                                   end_idx = -1,
+                                   chromosome = chromosome,
+                                   pad_end = True)
+        
+        return signal
+
+    def getSmoothedSignal(self, sample, chromosome):
+        """
+        Read smoothed signal for a specific sample and chromsome into an array.
+
+        params:
+            sample_name: Name of sample to get signal for.
+            chromosome: Chromosome to get signal for.
+        """
+
+        custom_sample_names = np.array(self.getSampleNames(return_custom = True))
+
+        if isinstance(sample, str):
+            bw_idx = self.sampleToIndex(sample)
+        elif isinstance(sample, (int, np.integer)):
+            bw_idx = sample
+            sample = custom_sample_names[bw_idx]
+        else:
+            raise ValueError("Invalid type for sample")
+
+        if self.verbose > 0:
+            print(f"Reading {chromosome}:0-{self.chrom_sizes[chromosome]} for {sample}")
+
+        # Read whole chromosome signal from array
+        smooth_signal = self.readArrayFile(bw_idx = bw_idx,
+                                           directory = self.output_directories["smooth_signal"],
+                                           file_prefix = os.path.join(chromosome, "smooth-signal"))[1]
+
+        return smooth_signal
+
+    def getNormSignal(self, sample, chromosome):
+        """
+        Read normalised bigWig signal for a specific sample and chromsome into an array.
+
+        params:
+            sample_name: Name of sample to get signal for.
+            chromosome: Chromosome to get signal for.
+        """
+
+        custom_sample_names = np.array(self.getSampleNames(return_custom = True))
+
+        if isinstance(sample, str):
+            bw_idx = self.sampleToIndex(sample)
+        elif isinstance(sample, (int, np.integer)):
+            bw_idx = sample
+            sample = custom_sample_names[bw_idx]
+        else:
+            raise ValueError("Invalid type for sample")
+
+        if self.verbose > 0:
+            print(f"Reading {chromosome}:0-{self.chrom_sizes[chromosome]} for {sample}")
+
+        # Read whole chromosome signal from bigWig
+        norm_signal = self.signalReader(bw_idx = bw_idx,
+                                        start_idx = 0,
+                                        end_idx = -1,
+                                        chromosome = chromosome,
+                                        pad_end = True,
+                                        read_normalised = True)
+        
+        return norm_signal
+
     def getSampleZones(self, chromosome, get_unpadded = True, get_padded = True):
         """
         Open signal zones coordinates for each sample. 
@@ -1033,6 +1244,8 @@ class ZoneNorm(ChromAnalysisExtended):
                                 for the sample for a specific chromosome.
         """
 
+        custom_sample_names = np.array(self.getSampleNames(return_custom = True))
+
         all_zones = {}
         zone_types = []
 
@@ -1045,14 +1258,16 @@ class ZoneNorm(ChromAnalysisExtended):
             sample_zones = {}
 
             for bw_idx in self.sample_ids:
+                sample_name = str(custom_sample_names[bw_idx])
                 zone_file = os.path.join(self.output_directories["signal_zones"], 
                                          chromosome, 
                                          zone_type.title(), 
                                          f"{zone_type}-zones_{self.file_sample_names[bw_idx]}.npy.gz")
 
                 if os.path.isfile(zone_file):
+                    # Record zone coordinates for the sample
                     zones = self.loadGzip(file_name = zone_file)
-                    sample_zones[bw_idx] = zones
+                    sample_zones[sample_name] = zones
 
             all_zones[zone_type] = sample_zones
 
@@ -1110,7 +1325,7 @@ class ZoneNorm(ChromAnalysisExtended):
             verbose:         Set as a number > 0 to print progress.
         """
 
-        sample_name = list(self.sample_names.keys())[bw_idx]
+        sample_name = self.getSampleNames(return_custom = True)[bw_idx]
 
         if read_normalised:
             # Open the normalised bigWig for the sample
@@ -1152,7 +1367,7 @@ class ZoneNorm(ChromAnalysisExtended):
             except:
                 if self.verbose > 0:
                     # Missing regions could be absent if the chromosome was sparse
-                    sample_name = list(self.sample_names.values())[bw_idx]
+                    sample_name = self.getSampleNames(return_custom = True)[bw_idx]
                     print(f"Warning: Could not find missing regions for {chromosome} {sample_name}")
                 return None
 
@@ -1243,7 +1458,7 @@ class ZoneNorm(ChromAnalysisExtended):
             missing_regions:    Coordinates of regions with all-zero signal.
         """
         
-        sample_names = np.array(list(self.sample_names.values()))
+        sample_names = np.array(self.getSampleNames(return_custom = True))
         sample_name = sample_names[bw_idx]
         n_samples = len(sample_names)
 
@@ -1456,8 +1671,8 @@ class ZoneNorm(ChromAnalysisExtended):
         
         params:
             directories:        List of directories to search,
-                                e.g. ['Erythroid_Donors/Temp/Pre-Normalised_Signals/chr20', 
-                                      'Erythroid_Donors/Temp/signal_scores/chr20'].
+                                e.g. ['Erythroid_Donors/Temp/Smooth_Signal/chr20', 
+                                      'Erythroid_Donors/Temp/Normalised_Signals/chr20'].
             file_names_regex:   Regex to remove consistent parts of file names when extracting 
                                 unique sample names,
                                 e.g. "^norm-signal_*|\.npy\.gz".
@@ -1472,6 +1687,9 @@ class ZoneNorm(ChromAnalysisExtended):
                                 more directory is missing.
             replace_existing:   Whether to overwrite previously created files.
         """
+
+        if len(directories) == 0:
+            raise ValueError("Directories cannot be empty")
 
         # Check to see if all directories have already been created
         directories_exist = np.array([os.path.exists(dir) for dir in directories])
@@ -1516,7 +1734,7 @@ class ZoneNorm(ChromAnalysisExtended):
             incomplete_bw_idxs = np.arange(len(self.sample_id_pairs))
 
         if not replace_existing:
-            # Set files to skip reading the signal for
+            # Set files to match
             if single_sample:
                 target_files = self.file_sample_names
             else:
@@ -1524,11 +1742,15 @@ class ZoneNorm(ChromAnalysisExtended):
                                          f"{self.file_sample_names[pair[1]]}" for
                                          pair in self.sample_id_pairs])
 
+            # Ensure names are agnostic between dashes and underscores
+            target_files = [f.replace("-", "_") for f in target_files]
+            # Set files to skip reading the signal for
             ignore_files = target_files.copy()
             
             for directory in current_files.keys():
                 # Check to see if any of the files already exist
-                ignore_files = np.intersect1d(ignore_files, current_files[directory])
+                check_files = [f.replace("-", "_") for f in current_files[directory]]
+                ignore_files = np.intersect1d(ignore_files, check_files)
 
             # Set files to create as those that could not be found
             # e.g. with samples "treatment_s1.bw", "treatment_s2.bw", "control_s1.bw",
@@ -1580,12 +1802,39 @@ class ZoneNorm(ChromAnalysisExtended):
 
         return interleaved_chroms
 
-    def readBigWigSignals(self, chromosomes = [], replace_existing = False):
+    def plotKernel(self, kernel = [], title = ""):
         """
-        Read signal from each bigWig, smooth signal and identify potential deletions.
+        Create a plot of a smoothing kernel.
 
         params:
-            chromosomes:      List of chromosomes to read signal from per bigWig in the chunk.
+            kernel: List or array containing kernel to plot. By default, the set kernel is shown.
+            title:  Set a custom title for the plot.
+        """
+
+        if len(kernel) == 0:
+            kernel = self.kernel
+        else:
+            kernel = np.array(kernel)
+
+        if len(title) == 0:
+            title = f"{self.analysis_name.replace('_', ' ')} Smoothing Kernel"
+
+        plt.figure(figsize = (4, 3))
+        plt.plot(kernel)
+        plt.title(title, fontweight = "bold")
+        plt.xlabel("Position (Base Pairs)")
+        plt.ylabel("Weight")
+        plt.show()
+
+    def convolveSignals(self, chromosomes = [], replace_existing = False):
+        """
+        Perform initial steps prior to signal zone prediction. These include reading signal 
+        from each bigWig, applying convolution to create a smoothed version of this signal,
+        calculating summary statistics about the signal, identifying potential deletions and 
+        removal of blacklisted regions.
+
+        params:
+            chromosomes:      List of chromosomes to read signal from per bigWig.
             replace_existing: Whether to overwrite previously created files.
         """
 
@@ -1720,7 +1969,7 @@ class ZoneNorm(ChromAnalysisExtended):
         """
 
         # Get the name of the sample according to its ID
-        custom_sample_name = list(self.sample_names.values())[bw_idx]
+        custom_sample_name = self.getSampleNames(return_custom = True)[bw_idx]
         file_sample_name = self.file_sample_names[bw_idx]
 
         if verbose > 0:
@@ -1740,7 +1989,6 @@ class ZoneNorm(ChromAnalysisExtended):
                 return None, None
         else:
             try:
-
                 # Read whole chromosome signal
                 signal = self.signalReader(bw_idx = bw_idx,
                                            start_idx = 0,
@@ -1819,7 +2067,7 @@ class ZoneNorm(ChromAnalysisExtended):
             if not os.path.exists(signal_stats_folder):
                 # Cannot test distributions if signal statistics not yet created
                 raise FileNotFoundError(f"No signal statistics yet calculated for {chrom}.\n"
-                                        f"First run readBigWigSignals.")
+                                        f"First run convolveSignals.")
             
             chrom_dist_stats_dir = os.path.join(self.output_directories["dist_stats"], chrom)
 
@@ -2128,7 +2376,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                   these to file.
         """
         
-        sample_name = np.array(list(self.sample_names.values()))[bw_idx]
+        sample_name = np.array(self.getSampleNames(return_custom = True))[bw_idx]
         n_samples = len(self.sample_ids)
 
         # Check whether to return results or save to file
@@ -2142,9 +2390,8 @@ class ZoneNorm(ChromAnalysisExtended):
             smoothed = True
             try:
                 # Open smoothed signal for the sample's chromosome
-                signal = self.readArrayFile(bw_idx = bw_idx,
-                                            directory = self.output_directories["smooth_signal"],
-                                            file_prefix = os.path.join(chromosome, "smooth-signal"))[1]
+                signal = self.getSmoothedSignal(sample = bw_idx, chromosome = chromosome)
+
             except Exception as e:
                 print(f"Warning: Could not read smoothed signal for {chromosome} {sample_name} "
                       f"due to exception\n")
@@ -2366,7 +2613,7 @@ class ZoneNorm(ChromAnalysisExtended):
                             the primary statistic is used.
         """
 
-        custom_sample_names = np.array(list(self.sample_names.values()))
+        custom_sample_names = np.array(self.getSampleNames(return_custom = True))
 
         if dist_stats_df is None:
             dist_stats_file = os.path.join(self.output_directories["output_stats"], 
@@ -2556,8 +2803,8 @@ class ZoneNorm(ChromAnalysisExtended):
 
         return best_params
 
-    def calculateZoneThreshold(self, dist_name, location = None, scale = None, zone_probability = None, 
-                               bw_idx = None, chromosome = None, param_type = None, 
+    def calculateZoneThreshold(self, dist_name = None, location = None, scale = None, zone_probability = None, 
+                               sample = None, chromosome = None, param_type = None, 
                                reverse_transform = True):
         """
         Translate the zone probability to a threshold that can be compared against the signal 
@@ -2570,7 +2817,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                param_type.
             zone_probability:  Probabilty threshold (between 0 to 1) from which the signal cut off is 
                                dervied from the distribution fitted for signal zone prediction.
-            bw_idx:            Sample ID to calculate zone threshold for.
+            sample:            Sample name or sample ID to calculate zone threshold for.
             chromosome:        Chromosome that distribution was fitted to.
             param_type:        Type of parameter used when fitting the distribution, i.e. 'scipy_fit', 
                                'mean_fit' or 'median_fit'. Can be bypassed by setting custom location 
@@ -2579,8 +2826,13 @@ class ZoneNorm(ChromAnalysisExtended):
                                distribution.
         """
 
-        if dist_name not in self.test_distributions:
+        bw_idx = None
+
+        if dist_name is None:
+            dist_name = self.zone_distribution
+        elif dist_name not in self.test_distributions:
             raise ValueError(f"Distribution {dist_name} was not found in test_distributions")
+        
         if zone_probability is None:
             # Use the set threshold
             zone_probability = self.zone_probability
@@ -2588,11 +2840,24 @@ class ZoneNorm(ChromAnalysisExtended):
             raise ValueError("zone_probability must be set as a probability between 0 and 1")
 
         if (location == None) and (scale == None):
-            if (param_type != None) and (bw_idx != None) and (chromosome != None):
-                sample_name = list(self.sample_names.values())[bw_idx]
+            if (sample != None) and (chromosome != None):
+                if isinstance(sample, str):
+                    # Convert sample name to sample index
+                    bw_idx = self.sampleToIndex(sample)
+                elif isinstance(sample, (int, np.integer)):
+                    # Sample index was given
+                    bw_idx = sample
+                else:
+                    raise ValueError("Unsupported type for sample")
+
+                if param_type is None:
+                    param_type = self.zone_param_type
+                
+                # Get custom sample name
+                sample_name = self.getSampleNames(return_custom = True)[bw_idx]
 
                 # Open the fitted distribution statistics
-                dist_stats_df = self.getSignalStats(stats_type = "distribution")
+                dist_stats_df = self.getDistributionStats()
 
                 sample_found = sample_name in np.array(dist_stats_df["sample"])
                 chrom_found = chromosome in np.array(dist_stats_df["chrom"], 
@@ -2608,7 +2873,7 @@ class ZoneNorm(ChromAnalysisExtended):
 
                     # Recreate the statistics
                     self.combineStats(stats_type = "distribution")
-                    dist_stats_df = self.getSignalStats(stats_type = "distribution")
+                    dist_stats_df = self.getDistributionStats()
 
                 # Get fitted distribution for the sample and chromosome
                 dist_stats_df = dist_stats_df[(dist_stats_df["sample"] == sample_name) &
@@ -2625,8 +2890,8 @@ class ZoneNorm(ChromAnalysisExtended):
                 scale = dist_stats_df["scale"].iloc[0]
 
             else:
-                raise ValueError("If no location and scale are given, bw_idx, chromosome "
-                                 "and param_type must be given")
+                raise ValueError("If no location and scale are given, sample and chromosome "
+                                 "must be given")
 
         elif location == None:
             raise ValueError("Location cannot be None is scale is set")
@@ -2642,7 +2907,17 @@ class ZoneNorm(ChromAnalysisExtended):
             # Reverse log transformation if applied
             zone_threshold *= np.e
 
-        if bw_idx is not None:
+        if sample is not None:
+            if bw_idx is None:
+                if isinstance(sample, str):
+                    # Convert sample name to sample index
+                    bw_idx = self.sampleToIndex(sample)
+                elif isinstance(sample, (int, np.integer)):
+                    # Sample index was given
+                    bw_idx = sample
+                else:
+                    raise ValueError("Unsupported type for sample")
+
             if self.mean_genome_signals[bw_idx] < 0:
                 # Flip sign if signal is negative
                 zone_threshold *= -1
@@ -2679,11 +2954,14 @@ class ZoneNorm(ChromAnalysisExtended):
             raise ValueError(f"Distribution {dist_name} was not found in test_distributions")
 
         if (location == None) and (scale == None):
-            if (param_type != None) and (bw_idx != None) and (chromosome != None):
-                sample_name = list(self.sample_names.values())[bw_idx]
+            if (bw_idx != None) and (chromosome != None):
+                if param_type is None:
+                    param_type = self.zone_param_type
+
+                sample_name = self.getSampleNames(return_custom = True)[bw_idx]
 
                 # Open the fitted distribution statistics
-                dist_stats_df = self.getSignalStats(stats_type = "distribution")
+                dist_stats_df = self.getDistributionStats()
 
                 sample_found = sample_name in np.array(dist_stats_df["sample"])
                 chrom_found = chromosome in np.array(dist_stats_df["chrom"], 
@@ -2699,7 +2977,7 @@ class ZoneNorm(ChromAnalysisExtended):
 
                     # Recreate the statistics
                     self.combineStats(stats_type = "distribution")
-                    dist_stats_df = self.getSignalStats(stats_type = "distribution")
+                    dist_stats_df = self.getDistributionStats()
 
                 # Get fitted distribution for the sample and chromosome
                 dist_stats_df = dist_stats_df[(dist_stats_df["sample"] == sample_name) &
@@ -2717,7 +2995,7 @@ class ZoneNorm(ChromAnalysisExtended):
 
             else:
                 raise ValueError("If no location and scale are given, bw_idx, chromosome "
-                                 "and param_type must be given")
+                                 "must be given")
 
         elif location == None:
             raise ValueError("Location cannot be None is scale is set")
@@ -2775,7 +3053,7 @@ class ZoneNorm(ChromAnalysisExtended):
         """
 
         # Get the name of the sample according to its ID
-        custom_sample_name = list(self.sample_names.values())[bw_idx]
+        custom_sample_name = self.getSampleNames(return_custom = True)[bw_idx]
         file_sample_name = self.file_sample_names[bw_idx]
         chrom_size = self.chrom_sizes[chromosome]
 
@@ -2819,7 +3097,7 @@ class ZoneNorm(ChromAnalysisExtended):
             negative = False
 
         # Calculate the threshold from the fitted distribution
-        zone_threshold = self.calculateZoneThreshold(bw_idx = bw_idx,
+        zone_threshold = self.calculateZoneThreshold(sample = bw_idx,
                                                      chromosome = chromosome,
                                                      dist_name = dist_name, 
                                                      param_type = param_type,
@@ -3161,7 +3439,7 @@ class ZoneNorm(ChromAnalysisExtended):
             replace_existing:  Whether to overwrite previously created files.
         """
 
-        custom_sample_names = list(self.sample_names.keys())
+        custom_sample_names = self.getSampleNames(return_custom = True)
 
         if len(chromosomes) == 0:
             chromosomes = self.chromosomes
@@ -3541,7 +3819,7 @@ class ZoneNorm(ChromAnalysisExtended):
         """
             
         # Get the name of the sample according to its ID
-        custom_sample_name = list(self.sample_names.values())[bw_idx]
+        custom_sample_name = self.getSampleNames(return_custom = True)[bw_idx]
         file_sample_name = self.file_sample_names[bw_idx]
         n_samples = len(self.sample_ids)
 
@@ -3638,7 +3916,7 @@ class ZoneNorm(ChromAnalysisExtended):
             file_name:         File name and path to save normalised signal to.
         """
 
-        sample_name = np.array(list(self.sample_names.values()))[bw_idx]
+        sample_name = np.array(self.getSampleNames(return_custom = True))[bw_idx]
 
         # Open full signal prior to normalisation
         signal = self.signalReader(bw_idx = bw_idx,
@@ -3746,7 +4024,7 @@ class ZoneNorm(ChromAnalysisExtended):
                 if self.verbose > 0:
                     print(f"Full {self.norm_method} normalised signal already created")
 
-        custom_sample_names = np.array(list(self.sample_names.values()))
+        custom_sample_names = np.array(self.getSampleNames(return_custom = True))
 
         if create_normalised_signal:
             # Set-up for multiprocessing
@@ -3762,7 +4040,7 @@ class ZoneNorm(ChromAnalysisExtended):
             else:
                 use_signal_stats = True
                 # Recreate signal statistics
-                signal_stats = self.getSignalStats(stats_type = "signal", replace_existing = True)
+                signal_stats = self.getSignalStats(replace_existing = True)
 
                 # Get statistics for samples and chromosomes for which to create normalised signal
                 signal_stats = signal_stats.loc[(np.isin(signal_stats["sample"], 
@@ -3976,7 +4254,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                    end_col: missing_regions[:,1]})
 
         missing_df.to_csv(os.path.join(output_dir, 
-                                       f"missing-regions_{list(self.sample_names.values())[bw_idx]}.csv"), 
+                                       f"missing-regions_{self.getSampleNames(return_custom = True)[bw_idx]}.csv"), 
                           header = True, index = False)
 
     def saveSignalStats(self, bw_idx, chromosome, signal_stats, signal_type, file_name = "", 
@@ -3994,7 +4272,7 @@ class ZoneNorm(ChromAnalysisExtended):
         """
 
         # Get the name of the sample according to its ID
-        custom_sample_name = list(self.sample_names.values())[bw_idx]
+        custom_sample_name = self.getSampleNames(return_custom = True)[bw_idx]
         file_sample_name = self.file_sample_names[bw_idx]
 
         if file_name == "":
@@ -4165,7 +4443,7 @@ class ZoneNorm(ChromAnalysisExtended):
             return_df:  Set as True to return the updated statistics DataFrame.
         """
 
-        custom_sample_names = np.array(list(self.sample_names.values()))
+        custom_sample_names = np.array(self.getSampleNames(return_custom = True))
         file_sample_names = self.file_sample_names
 
         if stats_type not in ["signal", "distribution"]:
@@ -4227,7 +4505,7 @@ class ZoneNorm(ChromAnalysisExtended):
         if len(combined_stats) == 0:
             if stats_type == "signal":
                 raise ValueError(f"Could not find signal statistics for any chromosome.\n"
-                                 f"These can be created with readBigWigSignals.")
+                                 f"These can be created with convolveSignals.")
             else:
                 raise ValueError(f"Could not find distribution statistics for any chromosome.\n"
                                  f"To produce distribution statistics, run testDistributions.")
@@ -4254,7 +4532,7 @@ class ZoneNorm(ChromAnalysisExtended):
             return_df: Set as True to return the updated statistics DataFrame.
         """
 
-        custom_sample_names = np.array(list(self.sample_names.values()))
+        custom_sample_names = np.array(self.getSampleNames(return_custom = True))
         file_sample_names = self.file_sample_names
 
         if file_name == "" and (not return_df):
@@ -4321,7 +4599,7 @@ class ZoneNorm(ChromAnalysisExtended):
         # Create new directory to store smoothed bigwig tracks
         os.makedirs(smooth_bigwigs_dir, exist_ok = True)
 
-        sample_names = np.array(list(self.sample_names.values()))[sample_ids]
+        sample_names = np.array(self.getSampleNames(return_custom = True))[sample_ids]
                 
         if self.n_cores > 1:
             # Run multiple processes in parallel
@@ -4362,7 +4640,7 @@ class ZoneNorm(ChromAnalysisExtended):
             # Create new directory to store normalised bigwig tracks
             os.makedirs(normalised_bigwigs_dir, exist_ok = True)
 
-            sample_names = np.array(list(self.sample_names.values()))[sample_ids]
+            sample_names = np.array(self.getSampleNames(return_custom = True))[sample_ids]
                 
             if self.n_cores > 1:
                 # Run multiple processes in parallel
@@ -4405,7 +4683,7 @@ class ZoneNorm(ChromAnalysisExtended):
             calculate_stats:    Whether to include dictionary of signal statistics in output.
         """
 
-        sample_name = list(self.sample_names)[bw_idx]
+        sample_name = self.getSampleNames(return_custom = True)[bw_idx]
 
         # Open the fitted distribution statistics
         dist_stats_file = os.path.join(self.output_directories["dist_stats"],
@@ -4421,6 +4699,8 @@ class ZoneNorm(ChromAnalysisExtended):
         if len(plot_distributions) == 0:
             # If none specified, set to plot all distributions
             plot_distributions = all_distributions
+        elif not (isinstance(plot_distributions, (list, np.ndarray))):
+            raise ValueError("plot_distributions must be set as a list or array")
         else:
             keep_distributions = []
 
@@ -4499,17 +4779,17 @@ class ZoneNorm(ChromAnalysisExtended):
 
         return results
 
-    def plotSignalDistributions(self, bw_idx, chromosome, signal = np.array([]), transform_signal = True,
-                                downsample = False, plot_distributions = [], plot_param_types = [], 
-                                n_bins = 30, plot_zone_threshold = False, zone_probability = None, 
-                                title = "", max_ncols = 3, x_limits = [], y_limits = [],
-                                plot_width = 16, plot_height = 4, pdf_name = ""):
+    def plotDistributionFit(self, plot_sample, chromosome, signal = np.array([]), transform_signal = True,
+                            downsample = False, plot_distributions = [], plot_param_types = [], 
+                            n_bins = 30, plot_zone_threshold = True, zone_probability = None, 
+                            title = "", max_ncols = 3, x_limits = [], y_limits = [],
+                            plot_width = 16, plot_height = 4, pdf_name = ""):
         """
         Create histogram plot(s) of distribution(s) fitted for signal zone prediction. 
         These can help visually assess goodness-of-fit.
 
         params:
-            bw_idx:              The sample ID to get plot values for.
+            plot_sample:         Name of sample to plot values for.
             chromosome:          The chromosome to get plot values for.
             signal:              Optionally provide a signal to optionally transform and then create 
                                  the plot across.
@@ -4536,7 +4816,21 @@ class ZoneNorm(ChromAnalysisExtended):
             pdf_name:            To save plot to PDF, set this as a file name.
         """
 
-        sample_name = np.array(list(self.sample_names.values()))[bw_idx]
+        custom_sample_names = self.getSampleNames(return_custom = True)
+
+        if isinstance(plot_sample, str):
+            bw_idx = self.sampleToIndex(plot_sample)
+
+        elif isinstance(plot_sample, (int, np.integer)):
+            # Use as sample ID
+            bw_idx = plot_sample
+
+            if bw_idx < 0 or bw_idx >= len(custom_sample_names):
+                raise IndexError(f"Plot sample was set as a sample ID ({bw_idx}) that is out of range")
+            
+            plot_sample = custom_sample_names[bw_idx]
+
+        sample_name = np.array(self.getSampleNames(return_custom = True))[bw_idx]
         plot_param_types = np.array(plot_param_types)
 
         if pdf_name:
@@ -4691,7 +4985,7 @@ class ZoneNorm(ChromAnalysisExtended):
 
                 if plot_zone_threshold:
                     # Translate from probability to threshold to compare against signal
-                    zone_threshold = self.calculateZoneThreshold(bw_idx = bw_idx,
+                    zone_threshold = self.calculateZoneThreshold(sample = bw_idx,
                                                                  dist_name = dist_name,
                                                                  location = location,
                                                                  scale = scale,
@@ -4718,14 +5012,14 @@ class ZoneNorm(ChromAnalysisExtended):
 
         plt.show()
 
-    def plotQQPlot(self, bw_idx, chromosome, signal = np.array([]), transform_signal = True,
-                   downsample = True, plot_distributions = [], param_type = "median",
+    def plotQQPlot(self, plot_sample, chromosome, param_type, signal = np.array([]), 
+                   transform_signal = True, downsample = True, plot_distributions = [],
                    show_grid = True, title = "", plot_width = 15, plot_height = 3, pdf_name = ""):
         """
         Create quantile-quantile plot(s) per fitted distribution(s) for a specific parameter type.
 
         params:
-            bw_idx:              The sample ID to get plot values for.
+            plot_sample:         Name of sample to plot values for.
             chromosome:          The chromosome to get plot values for.
             signal:              Optionally provide a signal to optionally transform and then create 
                                  the plot across.
@@ -4733,7 +5027,8 @@ class ZoneNorm(ChromAnalysisExtended):
                                  downsampling.
             downsample:          Set as True to downsample the signal.
             plot_distributions:  List of distributions to plot.
-            param_types:         Distribution fitting parameter type to plot, e.g. "mean_fit".
+            param_type:          Distribution fitting parameter type to plot, e.g. "mean_fit" or "infer" 
+                                 to use the type that had the overall lowest KS statistic across samples.
             show_grid:           Set as True to show a grid in the background.
             title:               Title to display at top of plot.
             plot_width:          Length of the plot.
@@ -4741,7 +5036,19 @@ class ZoneNorm(ChromAnalysisExtended):
             pdf_name:            To save plot to PDF, set this as a file name.
         """
 
-        sample_name = list(self.sample_names.values())[bw_idx]
+        custom_sample_names = self.getSampleNames(return_custom = True)
+
+        if isinstance(plot_sample, str):
+            bw_idx = self.sampleToIndex(plot_sample)
+                
+        elif isinstance(plot_sample, (int, np.integer)):
+            # Use as sample ID
+            bw_idx = plot_sample
+
+            if bw_idx < 0 or bw_idx >= len(custom_sample_names):
+                raise IndexError(f"Plot sample was set as a sample ID ({bw_idx}) that is out of range")
+            
+            plot_sample = custom_sample_names[bw_idx]
 
         if pdf_name:
             if not pdf_name.endswith(".pdf"):
@@ -4791,7 +5098,7 @@ class ZoneNorm(ChromAnalysisExtended):
                 all_param_types = [p.removesuffix("_fit") for p in np.unique(dist_stats_df["param_type"])]
                 if param_type not in all_param_types:
                     raise ValueError(f'param_type "{param_type}" was not found in the distribution '
-                                     f"statistics for {chromosome} {sample_name}")
+                                     f"statistics for {chromosome} {plot_sample}")
             else:
                 raise ValueError(f'param_type "{param_type}" is not supported.\n'
                                 f"Options include: {', '.join(self.param_types)}")
@@ -4842,7 +5149,7 @@ class ZoneNorm(ChromAnalysisExtended):
                 ax.set_ylabel("")
 
         if title == "":
-            title = f'Q-Q Plot{"s" if n_dists > 0 else ""} for {sample_name} ({chromosome}) '
+            title = f'Q-Q Plot{"s" if n_dists > 0 else ""} for {plot_sample} ({chromosome}) '
             title += f'- {param_type.title().replace("_", " ")}'
         
         plt.suptitle(title, fontweight = "bold")

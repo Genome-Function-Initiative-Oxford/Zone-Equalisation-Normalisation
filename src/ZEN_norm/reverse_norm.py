@@ -9,16 +9,13 @@ from .chrom_analysis import ChromAnalysisExtended
 
 class ReverseNorm(ChromAnalysisExtended):
     __slots__ = ("divisors", "contain_floats")
-    def __init__(self, bigwig_paths = [], bigwig_directory = "", sample_names = [], 
-                 blacklist = "", n_cores = 1, analysis_name = "Analysis", verbose = 1):
+    def __init__(self, bigwig_paths = [], sample_names = [], blacklist = "", n_cores = 1, analysis_name = "Analysis", verbose = 1):
         """
         Reverse linear normalisation method applied to bigWigs.
 
         params:
             bigwig_paths:        List of paths of bigWig and/or wig files of interest. This takes
                                  priority over bigwig_directory.
-            bigwig_directory:    Directory containing the bigWig and/or wig files of interest. This is
-                                 required if neither bam_paths, bam_directory or bigwig_paths are set.
             sample_names:        Optionally set as a list of custom names corresponding to each file.
                                  e.g. 'cntrl_s1.bw' and 'flt3_inhibitor_s1.bw' could be set as 
                                  ["Control Sample", "Treated Sample"].
@@ -35,7 +32,6 @@ class ReverseNorm(ChromAnalysisExtended):
 
         # Initialise the parent class
         super().__init__(bigwig_paths = bigwig_paths,
-                         bigwig_directory = bigwig_directory,
                          allow_bams = False, # Only allow bigWigs or wig files to be input
                          sample_names = sample_names,
                          blacklist = blacklist,
@@ -259,7 +255,7 @@ class ReverseNorm(ChromAnalysisExtended):
 
         return signal
 
-    def reverseNorm(self, chunk_size = 10000000, chromosomes = [], replace_existing = False):
+    def runReversal(self, chunk_size = 10000000, chromosomes = [], replace_existing = False):
         """
         Run reverse normalisation of all sample bigWigs.
         
@@ -274,10 +270,17 @@ class ReverseNorm(ChromAnalysisExtended):
         """
 
         custom_sample_names = np.array(list(self.sample_names.values()))
-
         calculate_frags = True
 
-        os.makedirs(self.output_directories["bigwig"], exist_ok = True)
+        # Find indexes of samples that have not yet been reverse normalised
+        incomplete_bw_idxs = self.findCurrentFiles(directories = [self.output_directories["bigwig"]],
+                                                   file_names_regex = "_reverse_norm.bw")
+
+        if len(incomplete_bw_idxs) == 0:
+            if self.verbose > 0:
+                print("Reverse normalised bigWigs already created for all samples")
+            
+            return None
 
         if not replace_existing:
             if (len(self.divisors) > 0) & (len(self.contain_floats) > 0):
@@ -299,7 +302,7 @@ class ReverseNorm(ChromAnalysisExtended):
             processes = []
             executor = ProcessPoolExecutor(self.n_cores)
 
-        for bw_idx in self.sample_ids:
+        for bw_idx in incomplete_bw_idxs:
             # Get the sample specific divisor
             div = self.divisors[bw_idx]
             is_float = self.contain_floats[bw_idx]

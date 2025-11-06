@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
+import re
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
@@ -14,33 +15,34 @@ from .chrom_analysis import ChromAnalysisCore
 # Main class for normalisation comparision
 ##########################################
 
-class NormCompare(ChromAnalysisCore):
-    __slots__ = ("bigwig_df", "peaks_df", "coords_df", "min_peak_score", "min_consensus", "border_pad", 
+class CompareNorm(ChromAnalysisCore):
+    __slots__ = ("bigwig_df", "regions_df", "coords_df", "min_peak_score", "min_consensus", "border_pad", 
                  "norm_methods", "chrom_maxs")
 
-    def __init__(self, bigwig_df, peaks_df = None, coords_df = None, min_peak_score = None, 
+    def __init__(self, bigwig_df, regions_df = None, coords_df = None, min_peak_score = None, 
                  min_consensus = 1, border_pad = 0, n_cores = 1, analysis_name = "Analysis", 
                  verbose = 1):
         """
         Class to create plots for comparing normalisation method performance.
         
         params:
-            bigwig_df:      DataFrame with columns "norm", "sample" and "bigwig", where each row 
-                            contains the name of the normalisation method, sample name and bigWig path.
-            peaks_df:       To evaluate normalisation performance over peaks, set as a DataFrame with 
-                            columns "sample" and "peaks", where peaks are given by paths to BED or 
-                            narrowPeak files.
+            bigwig_df:      How input bigWigs are mapped to the samples they belong to and the normalisation 
+                            method that was applied. Settable as either a file path to a CSV or as a 
+                            DataFrame with columns "norm", "sample" and "bigwig", where each row contains 
+                            the name of the normalisation method, sample name and bigWig path.
+            regions_df:     To evaluate normalisation performance over regions such as peaks, zones or 
+                            custom coordinates, set as a DataFrame with columns "sample" and "regions", 
+                            where regions are given by paths to BED or narrowPeak files.
             coords_df:      To evaluate normalisation performance over custom coordinates, set as a 
-                            DataFrame containing "chrom", "start" and "end". Must be given if peaks_df 
+                            DataFrame containing "chrom", "start" and "end". Must be given if regions_df 
                             is not specified.
             min_peak_score: Threshold between 0 to 1 to filter peaks by if LanceOtron peaks are given 
-                            in peaks_df.
-            min_consensus:  Minimum number of samples that a peak is present in for it to be included 
+                            in regions_df.
+            min_consensus:  Minimum number of samples that a region is present in for it to be included 
                             when evaluating each normalisation method. By default this is 1 so that 
-                            all peaks are included.
-            border_pad:     How close coordinates (either peaks or custom coordinates) have to be to be 
-                            combined, e.g. [1,000, 3,000] and [4,000, 10,000] with border_pad = 1,000 
-                            would be merged.
+                            all regions are included.
+            border_pad:     How close region coordinates have to be to be combined, 
+                            e.g. [1,000, 3,000] and [4,000, 10,000] with border_pad = 1,000 would be merged.
             n_cores:        The number of cores / CPUs to use if using multiprocessing.
             analysis_name:  Custom name of folder to save results to. By default this will be set to 
                             "Analysis".
@@ -53,14 +55,48 @@ class NormCompare(ChromAnalysisCore):
                          verbose = verbose)
 
         self.output_directories["plots"] = os.path.join(self.output_directories["results"], "Plots")
+        self.output_directories["output_stats"] = os.path.join(self.output_directories["results"], "Stats")
 
         self.setMinPeakScore(min_peak_score)
         self.setMinConsensus(min_consensus)
         self.setBorderPad(border_pad)
         self.setBigWigs(bigwig_df = bigwig_df)
-        self.setCoords(peaks_df = peaks_df, coords_df = coords_df)
+        self.setCoords(regions_df = regions_df, coords_df = coords_df)
         self.setChromAttributes()
         
+    def __str__(self):
+        """ Format parameters in user readable way when print is called on an object """
+
+        if self.verbose <= 0:
+            verbose_msg = "(silent)"
+        elif self.verbose == 1:
+            verbose_msg = "(active)"
+        else:
+            verbose_msg = "(debugging mode)"
+
+        min_consensus_msg = f"regions must be present in at least {self.min_consensus} sample"
+
+        if self.min_consensus != 1:
+            min_consensus_msg += "s"
+
+        message = (f'{self.__class__.__name__} object for "{self.analysis_name}"\n'
+                   f"   * Number of samples: {len(self.sample_names)}\n"
+                   f"   * Sample names: {', '.join(self.sample_names)}\n"
+                   f"   * Normalisation methods: {', '.join(self.norm_methods)}\n"
+                   f"   * LanceOtron minimum peak score: {self.min_peak_score}\n"
+                   f"   * Minimum consensus: {min_consensus_msg}\n"
+                   f"   * Resources: {self.n_cores} cores\n"
+                   f"   * Verbose: {self.verbose} {verbose_msg}")
+
+        return message
+
+    def setNCores(self, n_cores):
+        try:
+            self.n_cores = max(int(n_cores), 1)
+        except:
+            raise ValueError("n_cores must be a non-negative integer as this is the number of "
+                             "CPUs to use for parallelisation.")
+
     def setMinPeakScore(self, min_peak_score):
         if min_peak_score is not None:
             error_message = "Minimum peak score must be set as a value between 0 - 1, "
@@ -78,7 +114,7 @@ class NormCompare(ChromAnalysisCore):
         self.min_peak_score = min_peak_score
 
     def setMinConsensus(self, min_consensus):
-        error_message = "Minimum number of samples for consensus peaks, min_consensus, must be set as "
+        error_message = "Minimum number of samples for consensus regions, min_consensus, must be set as "
         error_message += "a positive integer"
         try:
             min_consensus = int(min_consensus)
@@ -173,58 +209,59 @@ class NormCompare(ChromAnalysisCore):
         self.norm_methods = bigwig_df["norm"].unique()
         self.sample_names = self.naturalSort(sample_names)
 
-    def setCoords(self, peaks_df = None, coords_df = None):
+    def setCoords(self, regions_df = None, coords_df = None):
         """
-        Set the coordinates DataFrame from either a given DataFrame or peak BED files. 
+        Set the coordinates DataFrame from either a given DataFrame or region BED files. 
         Any overlapping coordinates are merged.
 
         params:
-            peaks_df:  DataFrame containing 'sample' and 'peaks', where peaks are given by paths to 
-                       BED or narrowPeak files.
-            coords_df: Non-sample specific DataFrame containing 'chrom', 'start' and 'end'.
+            regions_df: DataFrame containing 'sample' and 'regions', where region coordinates are
+                        given by paths to BED or narrowPeak files.
+            coords_df:  Non-sample specific DataFrame containing 'chrom', 'start' and 'end'.
         """
 
-        if isinstance(peaks_df, pd.DataFrame):
+        if isinstance(regions_df, pd.DataFrame):
             # Check expected columns exist
             columns = []
                     
-            for col in peaks_df.columns:
+            for col in regions_df.columns:
                 # Sanitise the column names
                 col = col.strip().lower()
                 
-                if col.startswith("peak"):
-                    col = "peaks"
+                if col.startswith("region") or col.startswith("zone") or col.startswith("coord"):
+                    # Rename column for consistency
+                    col = "regions"
 
                 columns.append(col)
 
             # Check if any expected columns are missing
-            expected_columns = ["sample", "peaks"]
+            expected_columns = ["sample", "regions"]
             missing_columns = np.setdiff1d(columns, expected_columns)
 
             if len(missing_columns) > 0:
-                raise ValueError(f"peaks_df must contain columns {', '.join(expected_columns)}")
+                raise ValueError(f"regions_df must contain columns {', '.join(expected_columns)}")
 
             # Keep only relevant columns
-            peaks_df.columns = columns
-            peaks_df = peaks_df[expected_columns]
+            regions_df.columns = columns
+            regions_df = regions_df[expected_columns]
 
-            missing_samples = np.setdiff1d(self.sample_names, peaks_df["sample"])
+            missing_samples = np.setdiff1d(self.sample_names, regions_df["sample"])
             n_missing = len(missing_samples)
 
             if n_missing > 0:
-                raise ValueError(f"{n_missing} samples were missing files in the peaks_df")
+                raise ValueError(f"{n_missing} samples were missing files in the regions_df")
             
-            peak_paths = peaks_df["peaks"].to_list()
+            regions_paths = regions_df["regions"].to_list()
 
-            for file in peak_paths:
+            for file in regions_paths:
                 if (not file.endswith(".bed")) and (not file.endswith(".narrowPeak")):
-                    raise ValueError(f'Peak file "{file}" is not a BED or narrowPeak file')
+                    raise ValueError(f'Regions file "{file}" is not a BED or narrowPeak file')
                 elif not os.path.exists(file):
-                    raise FileNotFoundError(f'Peak file "{file}" does not exist')
+                    raise FileNotFoundError(f'Regions file "{file}" does not exist')
                 
-            # Set coordinates as merged coordinates across all peaks
-            self.peaks_df = peaks_df
-            self.coords_df = self.mergePeaks(peak_paths, min_consensus = self.min_consensus)
+            # Set coordinates as merged coordinates across all regions
+            self.regions_df = regions_df
+            self.coords_df = self.mergeRegions(regions_paths, min_consensus = self.min_consensus)
 
         elif isinstance(coords_df, pd.DataFrame):
             if coords_df.empty:
@@ -267,10 +304,11 @@ class NormCompare(ChromAnalysisCore):
                                                                chrom in chrom_coords]),
                                            "end": np.hstack([chrom_coords[chrom][:,1] for 
                                                              chrom in chrom_coords])})
-            self.peaks_df = None
+            self.regions_df = None
+            self.min_consensus = 1
 
         else:
-            raise ValueError("peaks_df or coords_df must be set as a DataFrame peak files or coordinates")
+            raise ValueError("regions_df or coords_df must be set as a DataFrame of region files or coordinates")
 
     def setChromAttributes(self):
         """
@@ -307,6 +345,105 @@ class NormCompare(ChromAnalysisCore):
 
         self.chrom_maxs = chrom_maxs
 
+    def getSampleNames(self):
+        return self.sample_names
+
+    def regexFindSamples(self, regex, second_regex = "", ignore_case = False, 
+                         exclude_samples = np.array([])):
+        """
+        Find all sample names that match regular expressions.
+
+        params:
+            regex:               Regex to match to sample names. For example, "b_cell" will match 
+                                 "treated_b_cell_1" and "b_cell_control" but not "t_cell_control_1".
+            second_regex:        Optional additional regex to match to sample names. Setting this 
+                                 will enable pairs of sample names to be returned formed comparing 
+                                 the first and second regex. If this is set as the same value as
+                                 regex, all paired combination of samples that match regex are returned.
+            ignore_case:         Set as True to make the search case-insensitive.
+            exclude_samples:     Optionally set list of sample names to ignore.
+        """
+
+        if ignore_case:
+            # Make case-insensitive
+            re_case = re.IGNORECASE
+        else:
+            re_case = 0
+
+        # Get sample names
+        sample_names = self.sample_names
+        exclude_samples = np.array(exclude_samples)
+        n_exclude = 0
+
+        if len(exclude_samples) > 0:
+            # Find indexes of the sample names to ignore
+            exclude_idxs = np.where(np.isin(sample_names, exclude_samples))[0]
+            n_exclude = len(exclude_idxs)
+
+            if n_exclude > 0:
+                # Remove names of samples
+                sample_names = np.delete(sample_names, exclude_idxs)
+
+        # Record sample names that match the first regex
+        regex_samples = []
+        unique_second_regex = False
+
+        if second_regex != "":
+            create_pairs = True
+            if regex != second_regex:
+                # If second unique regex is given, record sample names that match it
+                second_regex_samples = []
+                unique_second_regex = True
+        else:
+            create_pairs = False
+        
+        # Check each sample name to see if it falls within either regular expression
+        for sample in sample_names:
+            check = re.search(regex, sample, re_case)
+
+            if check:
+                regex_samples.append(sample)
+
+            elif unique_second_regex:
+                check = re.search(second_regex, sample, re_case)
+                if check:
+                    second_regex_samples.append(sample)
+
+        if len(regex_samples) == 0:
+            if self.verbose > 0:
+                print(f"No samples found with regex '{regex}'"
+                      f'{(" after excluding " + str(n_exclude)) if n_exclude > 0 else ""}')
+            # Nothing found so return empty array
+            return np.array([])
+
+        if create_pairs:
+            # Combine sample names into pairs
+            regex_sample_pairs = []
+
+            if unique_second_regex:
+                if len(second_regex_samples) == 0:
+                    if self.verbose > 0:
+                        print("No samples found with second regex '" + second_regex + "'")
+                    return np.array([])
+                
+                for sample_1 in regex_samples:
+                    for sample_2 in second_regex_samples:
+                        if sample_1 != sample_2:
+                            regex_sample_pairs.append([sample_1, sample_2])
+            else:
+                if len(regex_samples) == 1:
+                    if self.verbose > 0:
+                        print("Cannot form pairs for regex '" + regex + "' as only one sample found")
+                    return np.empty((0, 2))
+                else:
+                    for i, sample_1 in enumerate(regex_samples):
+                        for sample_2 in regex_samples[(i + 1):]:
+                            regex_sample_pairs.append([sample_1, sample_2])
+
+            return np.array(regex_sample_pairs)
+        else:
+            return np.array(regex_samples)
+
     @staticmethod
     def createPairs(samples):
         """
@@ -322,7 +459,133 @@ class NormCompare(ChromAnalysisCore):
         sample_pairs = sample_pairs[sample_pairs[:, 0] < sample_pairs[:, 1]]
 
         return sample_pairs
-    
+        
+    @staticmethod
+    def createBigWigFileCSV(sample_names, bigwig_directory, norm_methods, file_extension = ".bw", 
+                            csv_file = ""):
+        """
+        Create a DataFrame mapping normalised bigWigs with normalisation methods and sample names. 
+        bigWig files are assumed to be in subfolders within the given directory and named with convention 
+        [bigwig_directory]/[normalisation method]/[sample]_[normalisation method][file_extension]. 
+        The exception is for non-normalised (raw) bigWigs, which are named with convention 
+        [bigwig_directory]/No_Normalisation/[sample][file_extension].
+
+        params:
+            sample_names:     List or array of sample names to gather files for.
+            bigwig_directory: Directory containing subfolders with bigWigs per normalisation method.
+            norm_methods:     List or array of normalisation methods to collect file paths for.
+            file_extension:   Either '.bw' or '.bigWig'.
+            csv_file:         Set as a file name to save the DataFrame to a CSV.
+
+        returns:
+            bigwig_df: DataFrame with columns 'norm' 'sample' and 'bigwig'.
+        """
+
+        if len(sample_names) == 0:
+            raise ValueError("No samples given")
+            
+        if not os.path.isdir(bigwig_directory):
+            raise ValueError(f'Invalid path "{bigwig_directory}"')
+            
+        if not file_extension.startswith("."):
+            file_extension = "." + file_extension
+        if file_extension not in [".bw", ".bigWig"]:
+            raise ValueError('File extension must be either ".bw" or ".bigWig"')
+
+        save_to_csv = False
+
+        if csv_file != "":
+            save_to_csv = True
+
+            if not csv_file.endswith(".csv"):
+                csv_file = csv_file + ".csv"
+
+        bigwig_files = []
+
+        for norm in norm_methods:
+            norm = str(norm)
+
+            if norm.lower() in ["raw", "no_normalisation", "none"]:
+                non_normalised = True
+            else:
+                non_normalised = False
+
+            for sample in sample_names:
+                if non_normalised:
+                    # Set path for non-normalised (raw) bigWigs
+                    bigwig_files.append(f"{bigwig_directory}/No_Normalisation/{sample}{file_extension}")
+                else:
+                    # Set path for normalised bigWigs
+                    bigwig_files.append(f"{bigwig_directory}/{norm}/{sample}_{norm}{file_extension}")
+
+        # Create a CSV with rows per normalisation method, sample and bigWig path
+        bigwig_df = pd.DataFrame({"norm": np.array([[m] * len(sample_names) for m in norm_methods]).flatten(), 
+                                  "sample": np.tile(sample_names, len(norm_methods)),
+                                  "bigwig": bigwig_files})
+        
+        if save_to_csv:
+            bigwig_df.to_csv(csv_file, header = True, index = False)
+
+        return bigwig_df
+
+    @staticmethod
+    def createRegionsFileCSV(sample_names, regions_directory, file_prefix = "", file_postfix = "", 
+                             file_extension = ".bed", csv_file = ""):
+        """
+        Create a DataFrame mapping sample names to files with region coordinates (either BED or narrowPeak). 
+        Region files are assumed to be in the same directory, and named with convention 
+        [regions_directory]/[file_prefix][sample][file_postfix][file_extension].
+
+        params:
+            sample_names:       List or array of sample names to gather files for.
+            regions_directory:  Directory containing BED or narrowPeak files.
+            file_prefix:        Beginning part of the name of each file.
+            file_postfix:       End part of the name of each file.
+            file_extension:     Type of file region coordinates are saved as. Either '.bed' or '.narrowPeak'.
+            csv_file:           Set as a file name to save the DataFrame to a CSV.
+
+        returns:
+            regions_df: DataFrame with columns 'sample' and 'regions'.
+        """
+        
+        region_files = []
+
+        if len(sample_names) == 0:
+            raise ValueError("No samples given")
+        
+        if not os.path.isdir(regions_directory):
+            raise ValueError(f'Invalid path "{regions_directory}"')
+        
+        if not file_extension.startswith("."):
+            file_extension = "." + file_extension
+        if file_extension not in [".bed", ".narrowPeak"]:
+            raise ValueError('File extension must be either ".bed" or ".narrowPeak"')
+
+        save_to_csv = False
+
+        if csv_file != "":
+            save_to_csv = True
+
+            if not csv_file.endswith(".csv"):
+                csv_file = csv_file + ".csv"
+
+        for sample in sample_names:
+            # Create list of BED files
+            sample_regions_file = os.path.join(regions_directory, 
+                                               f"{file_prefix}{sample}{file_postfix}{file_extension}")
+            region_files.append(sample_regions_file)
+
+            if not os.path.exists(sample_regions_file):
+                print(f"Warning: File {sample_regions_file} does not exist")
+
+        regions_df = pd.DataFrame({"sample": sample_names,
+                                   "regions": region_files})
+
+        if save_to_csv:
+            regions_df.to_csv(csv_file, header = True, index = False)
+
+        return regions_df
+
     @staticmethod
     def mergeOverlapCoords(chrom_coords, border_pad = 0, min_consensus = 1, coord_ids = []):
         """ 
@@ -417,7 +680,7 @@ class NormCompare(ChromAnalysisCore):
                 else:
                     if len(group_ids) >= min_consensus:
                         # Merge coordinates only if a minimum number of samples is reached
-                        group_merged = NormCompare.mergeOverlapCoords(group_coords, 
+                        group_merged = CompareNorm.mergeOverlapCoords(group_coords, 
                                                                       border_pad = border_pad,
                                                                       min_consensus = 1)
                         merged_coords.extend(group_merged.tolist())
@@ -429,7 +692,7 @@ class NormCompare(ChromAnalysisCore):
 
             # Check last group
             if len(group_ids) >= min_consensus:
-                group_merged = NormCompare.mergeOverlapCoords(group_coords,
+                group_merged = CompareNorm.mergeOverlapCoords(group_coords,
                                                               border_pad = border_pad,
                                                               min_consensus = 1)
                 merged_coords.extend(group_merged.tolist())
@@ -439,13 +702,13 @@ class NormCompare(ChromAnalysisCore):
 
         return merged_coords
 
-    def mergePeaks(self, peak_paths, min_consensus = 1, border_pad = 0):
+    def mergeRegions(self, regions_paths, min_consensus = 1, border_pad = 0):
         """
-        Given a list of peak files, combine the coordinates within them.
+        Given a list of region coordinate files, combine the coordinates within them.
 
         params:
-            peak_paths:    List of file paths to peaks in BED or narrowPeak format.
-            min_consensus: Minimum number of samples that a peak is present in for it to be included 
+            regions_paths: List of file paths to region coordinates in BED or narrowPeak format.
+            min_consensus: Minimum number of samples that a region is present in for it to be included 
                            when evaluating each normalisation method.
             border_pad:    How close coordinates have to be to be combined.
                            e.g. [1,000, 3,000] and [4,000, 10,000] with border_pad = 1,000 would be 
@@ -456,34 +719,34 @@ class NormCompare(ChromAnalysisCore):
         coord_file_idxs = {}
 
         # Get coordinates for each chromosome across all peaks
-        for file_idx, file in enumerate(peak_paths):
+        for file_idx, file in enumerate(regions_paths):
             if os.path.exists(file):
                 if file.endswith(".bed"):
                     # Try read LanceOtron peaks
-                    peak_coords = pd.read_csv(file, sep = "\t", header = 0)
+                    region_coords = pd.read_csv(file, sep = "\t", header = 0)
 
-                    if len(peak_coords.columns) == 1:
+                    if len(region_coords.columns) == 1:
                         # Header found in BED file, so try again
-                        peak_coords = pd.read_csv(file, sep = "\t", header = None, skiprows = 1)
+                        region_coords = pd.read_csv(file, sep = "\t", header = None, skiprows = 1)
 
-                    elif (self.min_peak_score is not None) and ("overall_peak_score" in peak_coords.columns):
+                    elif (self.min_peak_score is not None) and ("overall_peak_score" in region_coords.columns):
                         # Filter peaks by peak score
-                        peak_coords = peak_coords[peak_coords["overall_peak_score"] >= self.min_peak_score]
+                        region_coords = region_coords[region_coords["overall_peak_score"] >= self.min_peak_score]
 
                 elif file.endswith(".narrowPeak"):
-                    peak_coords = pd.read_csv(file, sep = "\t", header = None)
+                    region_coords = pd.read_csv(file, sep = "\t", header = None)
 
                 else:
                     raise ValueError(f'Unsupported file extension for "{file}"')
 
                 # Keep only coordinates
-                peak_coords = peak_coords.iloc[:, :3]
-                peak_coords.columns = ["chrom", "start", "end"]
+                region_coords = region_coords.iloc[:, :3]
+                region_coords.columns = ["chrom", "start", "end"]
 
             else:
-                raise FileNotFoundError(f'Peak file "{file}" does not exist')
+                raise FileNotFoundError(f'Regions file "{file}" does not exist')
 
-            for chrom, chrom_rows in peak_coords.groupby("chrom"):
+            for chrom, chrom_rows in region_coords.groupby("chrom"):
                 chrom_rows = chrom_rows[["start", "end"]].to_numpy()
 
                 if chrom in chrom_coords:
@@ -499,7 +762,7 @@ class NormCompare(ChromAnalysisCore):
                         coord_file_idxs[chrom] = [file_idx] * len(chrom_rows)
 
         if len(chrom_coords) == 0:
-            raise ValueError("No peak coordinates found")
+            raise ValueError("No region coordinates found")
 
         merged_chrom_coords = {}
         coord_ids = []
@@ -509,7 +772,7 @@ class NormCompare(ChromAnalysisCore):
             if min_consensus > 1:
                 merge_chrom = False
 
-                # Check that peaks were found from the minimum number of samples
+                # Check that regions were found from the minimum number of samples
                 if chrom in coord_file_idxs:
                     coord_ids = coord_file_idxs[chrom]
 
@@ -530,7 +793,7 @@ class NormCompare(ChromAnalysisCore):
 
         if len(merged_chrom_coords) == 0:
             if self.verbose > 0:
-                print(f"Warning: no peaks found after merging")
+                print(f"Warning: no regions found after merging")
 
             coords_df = pd.DataFrame({"chrom": [], "start": [], "end": []})
 
@@ -736,18 +999,42 @@ class NormCompare(ChromAnalysisCore):
         # Combine sums across chromosomes
         combined_counts = {}
 
+        pos_sample_ids = []
+        neg_sample_ids = []
+
         for sample_id in sample_ids:
-            combined_counts[sample_id] = np.concatenate([chrom_counts[chrom][sample_id] for 
+            sample_counts = np.concatenate([chrom_counts[chrom][sample_id] for 
                                                          chrom in chrom_counts.keys()])
+            
+            # Split samples by positive and negative signal
+            total_counts = np.sum(sample_counts)
+            
+            if total_counts > 0:
+                pos_sample_ids.append(sample_id)
+            elif total_counts < 0:
+                neg_sample_ids.append(sample_id)
+            else:
+                if self.verbose > 0:
+                    print(f"Warning: Skipping {self.sample_names[sample_id]} as counts across "
+                          f"all regions were zero")
+                continue
+
+            # Get absolute value of counts to prevent log transformation errors
+            sample_counts = np.abs(sample_counts)
+            combined_counts[sample_id] = sample_counts
 
         # Create pairs of sample IDs to plot
-        sample_id_pairs = self.createPairs(sample_ids)
+        pos_id_pairs = self.createPairs(pos_sample_ids)
+        neg_id_pairs = self.createPairs(neg_sample_ids)
+        sample_id_pairs = np.concatenate((pos_id_pairs, neg_id_pairs)).astype(np.uint16)
+
         n_pairs = len(sample_id_pairs)
         n_cols = min(n_pairs, int(n_cols))
         n_rows = int(np.ceil(n_pairs / n_cols))
 
         # Create the figure
-        fig, axes = plt.subplots(n_rows, n_cols, figsize = (plot_width, plot_height))
+        fig, axes = plt.subplots(n_rows, n_cols, figsize = (plot_width, plot_height),
+                                 constrained_layout = True)
         axes = np.atleast_1d(axes).flatten()
 
         for i, pair in zip(range(n_pairs), sample_id_pairs):
@@ -767,6 +1054,10 @@ class NormCompare(ChromAnalysisCore):
             ax.set_xlabel("A (Mean Log Count)")
             ax.set_ylabel("M (Log Fold Change)")
 
+        for j in range(n_pairs, len(axes)):
+            # Hide unused subplots
+            axes[j].set_visible(False)
+
         if title == "":
             title = f"{norm_method} MA Plot"
             
@@ -774,7 +1065,6 @@ class NormCompare(ChromAnalysisCore):
                 title += f" ({chromosomes[0]})"
 
         fig.suptitle(title, fontweight = "bold")
-        plt.tight_layout()
 
         if pdf_name:
             plt.savefig(os.path.join(self.output_directories["plots"], pdf_name),
@@ -811,12 +1101,12 @@ class NormCompare(ChromAnalysisCore):
             # Read absolute value of signal within region for each sample
             sample_name = self.sample_names[sample_id]
             bw_file = bigwig_files[sample_name]
-            signals[sample_id] = np.abs(znorm.extractChunkSignal(bigwig_file = bw_file,
-                                                                 chromosome = chromosome,
-                                                                 start_idx = start_idx,
-                                                                 end_idx = end_idx,
-                                                                 sample_name = sample_name,
-                                                                 pad_end = True))
+            signals[sample_id] = np.abs(self.extractChunkSignal(bigwig_file = bw_file,
+                                                                chromosome = chromosome,
+                                                                start_idx = start_idx,
+                                                                end_idx = end_idx,
+                                                                sample_name = sample_name,
+                                                                pad_end = True))
 
         for pair in sample_id_pairs:
             sample_id_1 = int(pair[0])
@@ -896,7 +1186,7 @@ class NormCompare(ChromAnalysisCore):
                         plot_type = "violin", title = "", plot_width = 6, plot_height = 4, 
                         pdf_name = ""):
         """
-        Create violin or box plot of Wasserstein distance between samples over peaks or given 
+        Create violin or box plot of Wasserstein distance between samples over specified regions or
         coordinates.
 
         params:
@@ -907,8 +1197,8 @@ class NormCompare(ChromAnalysisCore):
             chromosomes:         List of chromosomes to include results for in the plot. If not set, all 
                                  chromosomes will be included.
             reference_norm:      Baseline normalisation to compare significance of results against.
-            pair_merge_coords:   Set as True to combine peak coordinates for sample pairs, or False to  
-                                 use peak coordinates combined across all samples. Not relavent if set 
+            pair_merge_coords:   Set as True to combine region coordinates for sample pairs, or False to  
+                                 use region coordinates combined across all samples. Not relavent if set 
                                  coordinates given.
             use_chrom_maxs:      Set as True to use chromosome-wide maximum values when mix-max scaling 
                                  signal during wasserstein distance calculation. Or set as False to use
@@ -940,6 +1230,13 @@ class NormCompare(ChromAnalysisCore):
             
         else:
             plot_samples = self.sample_names
+
+        n_samples = len(plot_samples)
+
+        if n_samples < 2:
+            raise ValueError(f"Not enough samples to create a Wasserstein distance plot. "
+                             f"{n_samples} sample{'s' if n_samples != 1 else ''} were set, but a "
+                             f"minimum of two is required to calculate pairwise distances.")
 
         if len(norm_methods) > 0:
             norm_methods = np.array(norm_methods)
@@ -978,7 +1275,24 @@ class NormCompare(ChromAnalysisCore):
         # Set numerical IDs for sample names
         name_id_map = {name: i for i, name in enumerate(self.sample_names)}
         sample_ids = np.array([name_id_map[s] for s in plot_samples])
-        sample_id_pairs = self.createPairs(sample_ids)
+
+        # Split samples into those with positive and negative signal
+        pos_sample_ids = []
+        neg_sample_ids = []
+
+        for sample_id in sample_ids:
+            # Find the highest value across chromosomes
+            max_over_chroms = np.max(list(self.chrom_maxs[sample_id].values()))
+            
+            if max_over_chroms > 0:
+                pos_sample_ids.append(sample_id)
+            else:
+                neg_sample_ids.append(sample_id)
+
+        # Create each combination of samples with other samples of the same sign
+        pos_id_pairs = self.createPairs(pos_sample_ids)
+        neg_id_pairs = self.createPairs(neg_sample_ids)
+        sample_id_pairs = np.concatenate((pos_id_pairs, neg_id_pairs)).astype(np.uint16)
 
         pair_chrom_maxs = {}
 
@@ -1051,12 +1365,14 @@ class NormCompare(ChromAnalysisCore):
             for pair in sample_id_pairs:
                 sample_id_1 = int(pair[0])
                 sample_id_2 = int(pair[1])
-                # Combine peaks for the pair
-                peak_paths = self.peaks_df[(self.peaks_df["sample"] == self.sample_names[sample_id_1]) | 
-                                           (self.peaks_df["sample"] == self.sample_names[sample_id_2])]["peaks"].to_numpy()
-                coords_dfs[(sample_id_1, sample_id_2)] = self.mergePeaks(peak_paths = peak_paths,
-                                                                         min_consensus = self.min_consensus,
-                                                                         border_pad = self.border_pad)
+
+                # Combine region coordinates for the pair
+                regions_paths = self.regions_df[(self.regions_df["sample"] == self.sample_names[sample_id_1]) | 
+                                                (self.regions_df["sample"] == self.sample_names[sample_id_2])]["regions"].to_numpy()
+                
+                coords_dfs[(sample_id_1, sample_id_2)] = self.mergeRegions(regions_paths = regions_paths,
+                                                                           min_consensus = self.min_consensus,
+                                                                           border_pad = self.border_pad)
 
         if self.verbose > 0:
             n_chroms = len(chromosomes)
@@ -1189,13 +1505,10 @@ class NormCompare(ChromAnalysisCore):
 
         dist_df = pd.concat([pd.DataFrame({"norm": norm, "wasserstein_distance": dists}) for 
                              norm, dists in wasserstein_dists.items()])
-        t_test_p_values = {}
 
         if len(dist_df) == 0:
             if self.verbose > 0:
                 print("Cannot create plot as no Wasserstein distances found")
-
-            return t_test_p_values
 
         if add_stars:
             # Map between normalisation methods to plot and indexes
@@ -1214,7 +1527,7 @@ class NormCompare(ChromAnalysisCore):
             cmap_norm = mcolors.Normalize(vmin = min(average_dists), vmax = max(average_dists))
             
         # Create the plot
-        fig, ax = plt.subplots(figsize = (plot_width, plot_height))
+        fig, ax = plt.subplots(figsize = (plot_width, plot_height), constrained_layout = True)
 
         if plot_type == "violin":
             sns.violinplot(data = dist_df, x = "norm", y = "wasserstein_distance", ax = ax, 
@@ -1230,20 +1543,32 @@ class NormCompare(ChromAnalysisCore):
             sns.boxplot(data = dist_df, x = "norm", y = "wasserstein_distance", ax = ax, 
                         log_scale = log_scale, palette = colour_palette)
 
+        t_test_p_values = []
+
         for norm_pair in norm_pairs:
             norm_1 = norm_pair[0]
             norm_2 = norm_pair[1]
 
+            # Perform t-test between Wasserstein distances of two normalisation methods
             t_test = stats.ttest_ind(wasserstein_dists[norm_1], wasserstein_dists[norm_2])
             p_value = float(t_test.pvalue)
-            t_test_p_values[tuple(norm_pair)] = p_value
+            t_test_p_values.append(p_value)
 
             if add_stars:
                 if (norm_1 == reference_norm) or (norm_2 == reference_norm):
+                    # Add significance stars between the reference normalisation and another normalisation
                     self.addPlotStars(ax = ax, x1 = norm_id_map[norm_1], x2 = norm_id_map[norm_2], 
                                       y = star_base_height - (star_increment * norm_id_map[norm_1]), 
                                       p_value = p_value)
                     
+        # Format t-test p-values as a DataFrame
+        t_test_csv_file = "wasserstein_t_test_p_values.csv"
+        t_test_df = pd.DataFrame({"norm_method_1": norm_pairs[:,0],
+                                  "norm_method_2": norm_pairs[:,1],
+                                  "t_test_p_value": t_test_p_values})
+        t_test_df.to_csv(os.path.join(self.output_directories["output_stats"], t_test_csv_file), 
+                         header = True, index = False)
+
         if add_colourmap:
             if plot_type == "violin":
                 for patch_idx, violin in enumerate(ax.collections):
@@ -1256,16 +1581,14 @@ class NormCompare(ChromAnalysisCore):
             sm = cm.ScalarMappable(cmap = cmap, norm = cmap_norm)
             sm.set_array([])
             cbar = fig.colorbar(sm, ax = ax, orientation = "vertical", fraction = 0.02, pad = 0.03)
+            cbar.set_label("Mean w", rotation = 270, labelpad = 15)
 
         plt.xlabel("Normalisation Method")
-        plt.ylabel("Wasserstein Distance")
+        plt.ylabel("Wasserstein Distance (w)")
         plt.title(title, fontweight = "bold")
-        plt.tight_layout()
 
         if pdf_name:
             plt.savefig(os.path.join(self.output_directories["plots"], pdf_name),
                         format = "pdf", bbox_inches = "tight")
 
         plt.show()
-
-        return t_test_p_values

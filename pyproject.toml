@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ZEN-norm_test"
-version = "0.0.15"
+version = "0.0.35"
 description = "Zone Equalisation Normalisation: A Python package for bigWig scaling"
 keywords = ["genomics", "genetics", "bioinformatics", "bigwig", "normalisation", "atac-seq", "chip-seq", "tt-seq"]
 authors = [
@@ -35,7 +35,8 @@ dependencies = [
     "matplotlib>=3.10",
     "seaborn>=0.13",
     "sympy>=1.14",
-    "scipy>=1.15"
+    "scipy>=1.15",
+    "deeptools==3.5.6"
 ]
 
 [project.urls]
