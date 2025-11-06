@@ -63,20 +63,6 @@ In the <a href="">ZEN Tutorial</a>, we demonstrate the features of ZEN-norm usin
 
 <a id=""></a>
 <details open="open">
-  <summary><b>Mouse Embryonic Stem Cell ATAC-seq</b></summary>
-  This dataset contains ATAC-seq of E14 mouse embryonic stem cells (mESCs) treated with leukemia inhibitory factor (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399494">LIF</a>) and retinoic acid (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399495">RA</a>) (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE120376">GSE120376</a>). Two bigWigs for these mapped to the mm10 genome can be downloaded from NCBI GEO using the following commands:
-
-```
-wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399495&format=file&file=GSM3399495%5FE14%5FATAC%5FRA%2Ebw" -O E14_ATAC_RA.bw
-```
-```
-wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file=GSM3399494%5FE14%5FATAC%5FLIF%2Ebw" -O E14_ATAC_LIF.bw
-```
-
-</details>
-
-<a id=""></a>
-<details open="open">
   <summary><b>Erythroid ATAC-seq</b></summary>
 
   Download all BAMs
@@ -119,6 +105,20 @@ wget -i tests/data/HeLa_TTseq_BAM_URLs.txt
 
 ```
 wget -i tests/data/HeLa_TTseq_bigWig_URLs.txt
+```
+
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Mouse Embryonic Stem Cell ATAC-seq</b></summary>
+  This dataset is used to demonstrate how pre-normalised bigWigs can be reverse normalised prior to normalisation with ZEN. It contains ATAC-seq from E14 mouse embryonic stem cells (mESCs) treated with leukemia inhibitory factor (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399494">LIF</a>) and retinoic acid (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3399495">RA</a>) (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE120376">GSE120376</a>). Two bigWigs for these mapped to the mm10 genome can be downloaded from NCBI GEO using the following commands:
+
+```
+wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399495&format=file&file=GSM3399495%5FE14%5FATAC%5FRA%2Ebw" -O E14_ATAC_RA.bw
+```
+```
+wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file=GSM3399494%5FE14%5FATAC%5FLIF%2Ebw" -O E14_ATAC_LIF.bw
 ```
 
 </details>
@@ -217,7 +217,7 @@ znorm = ZoneNorm(analysis_name = "mESC_Analysis",
 | <code>filter_strand</code> | Specifies whether to separated reads by strand when creating bigWigs from BAMs with deepTools. Setting as True will create a forward and reverse strand bigWig per BAM (e.g. for nascent transcription). Leaving as False will disable strand filtering. Setting this as "forward" or "reverse" will extract the specified strand per BAM. |
 | <code>exclude_zero</code> | Whether to ignore zeros when calculating statistics within signal zones. |
 | <code>zone_remove_percent</code> | Set as a value greater than zero to ignore an upper and lower percentile when calculating statistics of signal in zones. e.g. zone_remove_percent = 100 for a signal of 1,000,000 and norm_method = "ZEN" allows the 100th upper and lower percentile to be removed when calculating mean and standard deviation. This prevents extreme values, such as those caused by technical artifacts in ATAC/ChIP-seq, from biasing the normalisation. |
-| <code>norm_stats_type</code> | Type of statistics to use for ZEN normalisation. By default, this is "signal_padded_sample_zones", which will calculate averages and deviations from signal within sample-specific padded zones. Other options include: "signal_unpadded_sample_zones", which instead uses unpadded zones, "signal_padded_merged_zones" or "signal_unpadded_merged_zones", which use zone coordinates merged across all samples, or "signal", which considers all signal for statistics calculations. |
+| <code>norm_stats_type</code> | Type of statistics to use for normalisation with ZEN. By default, this is "signal_padded_sample_zones", which will calculate averages and deviations from signal within sample-specific padded zones. Other options include: "signal_unpadded_sample_zones", which instead uses unpadded zones, "signal_padded_merged_zones" or "signal_unpadded_merged_zones", which use zone coordinates merged across all samples, or "signal", which considers all signal for statistics calculations. |
 | <code>norm_power</code> | If norm_method is set as "Power", set this as a number to raise signal to the power of. |
 | <code>deletion_size</code> | Threshold number of consecutive zeros in the signal for a region to be considered a potential deletion. |
 | <code>downsample_size</code> | Number of positions of signal to select when fitting distributions. |
@@ -317,7 +317,7 @@ znorm.predictSignalZones()
 <a id=""></a>
 <details open="open">
   <summary><b>Creating Normalised bigWigs</b></summary>
-  Finally, the signal is normalised and outputted as bigWigs. For ZEN normalisation, this defaults to dividing signal by standard deviation within signal zones.
+  Finally, the signal is normalised and outputted as bigWigs. For normalisation with ZEN, this defaults to dividing signal by standard deviation within signal zones.
   
 ```python
 # Create normalised bigWigs
