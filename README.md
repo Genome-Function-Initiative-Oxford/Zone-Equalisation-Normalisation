@@ -70,7 +70,7 @@ The module `ReverseNorm` provides an optional step to enable non-normalised bigW
 from ZEN_norm.reverse_norm import ReverseNorm
 
 rev = ReverseNorm(analysis_name = "Example_Analysis", # Set custom output folder name
-                  bigwig_paths = ["path/sample_A.bw", "path/sample_B.bw"], # Specify a list of bigWig paths
+                  bigwig_paths = ["path/to/normalised_bigwigs/sample_A.bw", "path/to/normalised_bigwigs/sample_B.bw"], # Specify a list of bigWig paths
                   n_cores = 8) # Set number of cores to use
 rev.reverseNorm(chromosomes = ["chr19"])
 ```
@@ -94,7 +94,26 @@ The module `ZoneNorm` is normalises genomic coverage with ZEN. Steps include: BA
   <summary><b>Quick Example</b></summary>
 
 ```python
+# EITHER create bigWigs without normalisation from BAMs
+znorm = ZoneNorm(analysis_name = "Example_Analysis", # Name of output folder
+                 bam_paths = ["path/to/bams/sample_A.bam", "path/to/bams/sample_B.bam"], # List or directory of BAM files
+                 n_cores = 8, # Number of processors
+                 extend_reads = True, # Whether to extend reads during BAM to bigWig mapping (False recommended for transcriptional assays)
+                 filter_strand = False) # Whether to separate by strand (True recommended for transcriptional assays)
 
+# OR set bigWigs directly
+znorm = ZoneNorm(analysis_name = "Example_Analysis", # Name of output folder
+                 bigwig_paths = ["path/to/raw_bigwigs/sample_A.bw", "path/to/raw_bigwigs/sample_B.bw"], # List or directory of bigWig files
+                 n_cores = 8) # Number of processors
+
+# Create smoothed signal
+znorm.convolveSignals()
+# Test Laplace distribution
+znorm.testDistributions()
+# Use distribution to predict signal zone coordinates
+znorm.predictSignalZones()
+# Create normalised bigWigs
+znorm.normaliseSignal()
 ```
 
 </details>
@@ -112,6 +131,20 @@ To quantify genome-wide performance across normalisation methods, Wasserstein di
   <summary><b>Quick Example</b></summary>
 
 ```python
+# Set names of deepTools normalisation methods
+deeptools_norm = ["RPKM", "CPM", "BPM", "RPGC"]
+# Include no normalisation and ZEN normalisation
+all_norm_methods = ["Raw"] + deeptools_norm + ["ZEN"]
+
+# Create bigWigs for each normalisation method
+for norm in deeptools_norm:
+    ZoneNorm(analysis_name = "Example_Analysis", # Name of output folder
+             bam_paths = ["path/to/bams/sample_A.bam", "path/to/bams/sample_B.bam"], # List or directory of BAM files
+             n_cores = 8,
+             norm_method = norm,
+             extend_reads = True, # Whether to extend reads during BAM to bigWig mapping (False recommended for transcriptional assays)
+             genome_size = "hg38") # Set for species
+
 
 ```
 
