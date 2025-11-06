@@ -57,7 +57,7 @@ conda install zen-norm
 
 <a id="reverse_norm"></a>
 ## Reversing Prior bigWig Normalisation
-The module `ReverseNorm` enables non-normalised bigWigs to be created from bigWigs that have previously been normalised. This step is optional, but can be used to avoid double normalisation if renormalising bigWigs with ZEN. It works by estimating the coverage value that has been produced by a single read fragment, and dividing signal by this to obtain the coverage that would have been produced has linear normalisation not been applied. 
+The module `ReverseNorm` provides an optional step to enable non-normalised bigWigs to be created from bigWigs that have previously been normalised. This can be used to avoid double normalisation if renormalising bigWigs with ZEN. It works by estimating the coverage value that has been produced by a single read fragment, and dividing signal by this to obtain the coverage that would have been produced has linear normalisation not been applied. 
 
 <br>
 
@@ -85,14 +85,9 @@ rev.reverseNorm(chromosomes = ["chr19"])
 
 <a id="zen_norm"></a>
 ## Normalising bigWigs With ZEN
-The module `ZoneNorm` is for normalising genomic coverage with ZEN. Steps include: BAM to bigWig mapping, convolution to create smoothed signals, distribution fitting, signal zone prediction and generating bigWigs normalised with ZEN. It runs on genomic signals from either BAM or bigWig files. If your input files are bigWigs that have been pre-normalised, then it is advisable to first remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">reverse bigWig normalisation</a> feature.
-
-<a id="reverse_norm"></a>
-## Reversing Prior bigWig Normalisation
-The module `ReverseNorm` enables non-normalised bigWigs to be created from bigWigs that have previously been normalised. This step is optional, but can be used to avoid double normalisation if renormalising bigWigs with ZEN. It works by estimating the coverage value that has been produced by a single read fragment, and dividing signal by this to obtain the coverage that would have been produced has linear normalisation not been applied. 
+The module `ZoneNorm` is normalises genomic coverage with ZEN. Steps include: BAM to bigWig mapping, convolution to create smoothed signals, distribution fitting, signal zone prediction and generating bigWigs normalised with ZEN. It runs on genomic signals from either BAM or bigWig files. If your input files are bigWigs that have been pre-normalised, then it is advisable to first remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">reverse bigWig normalisation</a> feature.
 
 <br>
-
 
 <a id=""></a>
 <details open="open">
@@ -112,103 +107,20 @@ The module `ReverseNorm` enables non-normalised bigWigs to be created from bigWi
 ## Evaluating Normalisation Method Performance
 To quantify genome-wide performance across normalisation methods, Wasserstein distribution plots or MA plots can be created.
 
-```python
-bw_df = pd.DataFrame({"norm": np.array([[m] * len(sample_names) for m in norm_methods]).flatten(), 
-                      "sample": np.tile(sample_names, len(norm_methods)),
-                      "bigwig": bigwig_files})
-
-peak_df = pd.DataFrame({"sample": sample_names,
-                        "peaks": peak_files})
-```
-
-```python
-from ZEN_norm.norm_compare import NormCompare
-
-norm_compare = NormCompare(bigwig_df = bw_df,
-                           peaks_df = peak_df,
-                           min_peak_score = 0.5,
-                           min_consensus = 1,
-                           n_cores = znorm.n_cores,
-                           analysis_name = "Analysis_Name",
-                           verbose = 2)
-```
-  
-  <br>
-</details>
-
 <a id=""></a>
 <details open="open">
-  <summary><b>Creating Wasserstein Distribution Plots</b></summary>
+  <summary><b>Quick Example</b></summary>
 
 ```python
-norm_compare.plotWasserstein(reference_norm = "ZEN", pdf_name = "Wasserstein_Plot.pdf")
+
 ```
 
-  <details>
-    <summary open="open"><b><sub>Key Parameters</sub></b></summary>
-
-| Parameter | Usage |
-| -------- | ------- |
-| <code>reference_norm</code> |  |
-| <code>pdf_name</code> |  |
-
-  </details>
-
-  <details>
-    <summary open="open"><b><sub>Additional Parameters</sub></b></summary>
-
-| Parameter | Usage |
-| -------- | ------- |
-| <code></code> |  |
-
-  </details>
-  
-</details>
-
-<a id=""></a>
-<details open="open">
-  <summary><b>Creating MA Plots</b></summary>
-
-```python
-norm_compare.MAPlot(norm_method, plot_samples = [], chromosomes = [], n_cols = 4,
-               point_transparency = 0.3, point_colour = "grey", title = "", plot_width = 8, plot_height = 6,
-               pdf_name = ""):
-```
-
-  <details>
-    <summary open="open"><b><sub>Key Parameters</sub></b></summary>
-
-| Parameter | Usage |
-| -------- | ------- |
-| <code>norm_method</code> |  |
-| <code>pdf_name</code> |  |
-
-  </details>
-
-  <details>
-    <summary open="open"><b><sub>Additional Parameters</sub></b></summary>
-
-| Parameter | Usage |
-| -------- | ------- |
-| <code>plot_samples</code> |  |
-| <code>chromosomes</code> |  |
-| <code>n_cols</code> |  |
-| <code>point_transparency</code> |  |
-| <code>point_colour</code> |  |
-| <code>title</code> |  |
-| <code>plot_width</code> |  |
-| <code>plot_height</code> |  |
-
-  </details>
-  
 </details>
 
 <br>
 
----
-
 <a id="visualising_bigwigs"></a>
-### Visualising bigWigs
+## Visualising bigWigs
 To visualise signal both before and / or after normalisation, it is recommended that you view signal on a genome browser such as UCSC or MLV. In addition, regions of bigWig signal can be viewed using ZEN-norm track plots.
 
 <a id=""></a>
