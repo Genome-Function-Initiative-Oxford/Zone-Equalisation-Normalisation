@@ -148,6 +148,8 @@ znorm.normaliseSignal()
 ## 5. Evaluating Normalisation Method Performance
 To quantify genome-wide performance across normalisation methods, Wasserstein distribution plots or MA plots can be created.
 
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_Wasserstein_Plot.jpg" width="70%"></p>
+
 <br>
 
 <a id="visualising_bigwigs"></a>
