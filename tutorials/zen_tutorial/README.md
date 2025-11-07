@@ -7,7 +7,7 @@
 
 <a id="example_data"></a>
 ## Example Data
-The following datasets are all publically avaliable and files of URLs can be found in this repository under <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/data">data</a>.
+The following datasets are all publically avaliable and files of URLs can be found in this repository in the <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/data">data</a> folder.
 
 <a id=""></a>
 <details open="open">
@@ -86,6 +86,7 @@ wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file
 ```
 
 </details>
+
 
 
 
