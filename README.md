@@ -175,7 +175,7 @@ When normalising genomic signal with ZEN, using bigWigs as inputs and outputs al
 <a id=""></a>
 <details open="open">
   <summary><b>Track Plots</b></summary>
-
+  When running ZEN-norm, regions of signal for one or more samples can be viewed as track plots. These can be customised, for example to view the signal before and after reverse normalisation, to visualise zone thresholds at different parameters, to view signal zones or as shown in the plot below, to check alignment of samples after ZEN normalisation.
 <p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_ZEN_Signal_Plot.png" width="100%"></p>
 
 </details>
@@ -183,5 +183,5 @@ When normalising genomic signal with ZEN, using bigWigs as inputs and outputs al
 <a id=""></a>
 <details open="open">
   <summary><b>Genome Browsers</b></summary>
-  <a href="https://genome.ucsc.edu/index.html">UCSC</a> <a href="https://mlv.molbiol.ox.ac.uk/">Multi Locus View (MLV)</a>
+  After saving signals to bigWigs and zones as BED files, they can be uploaded to an interactive genome browser such as <a href="https://genome.ucsc.edu/index.html">UCSC Genome Browser</a> or <a href="https://mlv.molbiol.ox.ac.uk/">Multi Locus View (MLV)</a>.
 </details>
