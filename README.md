@@ -148,7 +148,23 @@ znorm.normaliseSignal()
 ## 5. Evaluating Normalisation Method Performance
 To quantify genome-wide performance across normalisation methods, Wasserstein distribution plots or MA plots can be created.
 
+<a id=""></a>
+<details open="open">
+  <summary><b>Example Wasserstein Distance Plot</b></summary>
+  Within a Wasserstein distance plot, min-max scaled pairwise sample Wasserstein distance (w) is measured over fixed regions (e.g. peaks or zones) and plotted as violin and / or box plots per normalisation method. The normalisation method with the lowest average w therefore has the best alignment across the genome for regions of interest. For example in the plot below of erythroid ATAC-seq, ZEN has the lowest mean w and it is significantly lower than all other normalisation methods according to a t-test comparing the distributions.
+  
 <p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_Wasserstein_Plot.jpg" width="70%"></p>
+
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>Example MA Plot</b></summary>
+  MA plots compare differences in total signal (M) relative to signal intensity (A) between pairs of samples. This is useful to assess how effective a normalisation method is at reducing bias. For example in the HeLa TT-seq plot below, a point in each subplot represents the mean count of the signal over a region's coordinates for two samples after RPKM normalisation. The dotted red line is a reference, whereby the closer the points fall, the closer the average counts are for the samples.
+
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/HeLa_TTseq_Reverse_MA_Plot.png" width="100%"></p>
+
+</details>
 
 <br>
 
