@@ -107,7 +107,7 @@ rev.reverseNorm(chromosomes = ["chr19"])
 
 <a id="zone_norm"></a>
 ## 4. Normalising bigWigs With ZEN
-Module `ZoneNorm` normalises genomic coverage with ZEN. Steps include: BAM to bigWig mapping, convolution to create smoothed signals, distribution fitting, signal zone prediction and generating bigWigs normalised with ZEN. It runs on genomic signals from either BAMs or bigWigs. If using bigWigs that have been pre-normalised, then it is advisable to first remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">ReverseNorm</a> module.
+Module `ZoneNorm` normalises genomic coverage with ZEN. Steps include: BAM to bigWig mapping, convolution to create smoothed signals, distribution fitting, signal zone prediction (coordinates of consistent regions of signal) and generating bigWigs normalised with ZEN. It runs on genomic signals from either BAMs or bigWigs. If using bigWigs that have been pre-normalised, then it is advisable to first remap them without normalisation, or to use ZEN-norm's <a href="#reverse_norm">ReverseNorm</a> module.
 
 <br>
 
@@ -150,8 +150,8 @@ To quantify genome-wide performance across normalisation methods, Wasserstein di
 
 <a id=""></a>
 <details open="open">
-  <summary><b>Example Wasserstein Distance Plot</b></summary>
-  Within a Wasserstein distance plot, min-max scaled pairwise sample Wasserstein distance (w) is measured over fixed regions (e.g. peaks or zones) and plotted as violin and / or box plots per normalisation method. The normalisation method with the lowest average w therefore has the best alignment across the genome for regions of interest. For example in the plot below of erythroid ATAC-seq, ZEN has the lowest mean w and it is significantly lower than all other normalisation methods according to a t-test comparing the distributions.
+  <summary><b>Wasserstein Distance Plots</b></summary>
+  Within a Wasserstein distance plot, min-max scaled pairwise sample Wasserstein distance (w) is measured over regions (e.g. peaks or zones) and plotted as violin and / or box plots per normalisation method. The normalisation method with the lowest average w therefore has the best alignment across the genome for regions of interest. For example in the plot below of erythroid ATAC-seq, ZEN has the lowest mean w and it is significantly lower than all other normalisation methods according to a t-test comparing the distributions.
   
 <p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_Wasserstein_Plot.jpg" width="70%"></p>
 
@@ -159,8 +159,8 @@ To quantify genome-wide performance across normalisation methods, Wasserstein di
 
 <a id=""></a>
 <details open="open">
-  <summary><b>Example MA Plot</b></summary>
-  MA plots compare differences in total signal (M) relative to signal intensity (A) between pairs of samples. This is useful to assess how effective a normalisation method is at reducing bias. For example in the HeLa TT-seq plot below, a point in each subplot represents the mean count of the signal over a region's coordinates for two samples after RPKM normalisation. The dotted red line is a reference, whereby the closer the points fall, the closer the average counts are for the samples.
+  <summary><b>MA Plots</b></summary>
+  MA plots compare differences in total signal (M) relative to signal intensity (A) between pairs of samples across regions (e.g. peaks or zones). This is useful to assess how effective a normalisation method is at reducing bias. For example in the HeLa TT-seq plot below, a point in each subplot represents the mean count of the signal over a region's coordinates for two samples after RPKM normalisation. The dotted red line is a reference, whereby the closer the points fall, the closer the average counts are for the samples.
 
 <p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/HeLa_TTseq_Reverse_MA_Plot.png" width="100%"></p>
 
@@ -168,28 +168,20 @@ To quantify genome-wide performance across normalisation methods, Wasserstein di
 
 <br>
 
-<a id="visualising_bigwigs"></a>
-## 6. Visualising bigWigs
-To visualise signal both before and / or after normalisation, it is recommended that you view signal on a genome browser such as UCSC or MLV. In addition, regions of bigWig signal can be viewed using ZEN-norm track plots.
+<a id="visualising_signal"></a>
+## 6. Visualising Signal and Zones
+When normalising genomic signal with ZEN, using bigWigs as inputs and outputs allows some steps in the process to be visualised providing greater transparency then count based normalisation methods. For example, bigWigs can be saved after reverse normalisation, smoothing via convolution (useful to view thresholds against this signal) and after normalisation with ZEN. In additon, predicted signal zones (coordinates of consistent regions of signal) can be saved to BED files and visualised in the same way as peak calls. These signals can therefore be viewed using either track plots included in the package, or genome browsers.
 
 <a id=""></a>
 <details open="open">
-  <summary><b>UCSC Genome browser</b></summary>
-  <a href="https://genome.ucsc.edu/index.html">UCSC</a>
+  <summary><b>Track Plots</b></summary>
+
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_ZEN_Signal_Plot.png" width="100%"></p>
+
 </details>
 
 <a id=""></a>
 <details open="open">
-  <summary><b>Multi Locus View (MLV)</b></summary>
-  <a href="https://mlv.molbiol.ox.ac.uk/">MLV</a>
-</details>
-
-<a id=""></a>
-<details open="open">
-  <summary><b>ZEN-norm Signal Plots</b></summary>
-
-```python
-znorm.plotTracks(start_coord = 342825, end_coord = 357106, chromosome = "chr5", 
-                 plot_samples = znorm.regexFindSamples(regex = "1_neg", ignore_case = True))
-```
+  <summary><b>Genome Browsers</b></summary>
+  <a href="https://genome.ucsc.edu/index.html">UCSC</a> <a href="https://mlv.molbiol.ox.ac.uk/">Multi Locus View (MLV)</a>
 </details>
