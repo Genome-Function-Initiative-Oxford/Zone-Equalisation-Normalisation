@@ -18,14 +18,14 @@ replicates each (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE
 <a id=""></a>
 <details open="open">
   <summary><b>CATlas Single-Cell ATAC-seq</b></summary>
-  222 scATAC-seq bigWigs from human tissues can be downloaded from the <a href="https://decoder-genetics.wustl.edu/catlasv1/catlas_downloads/humantissues/Bigwig/">CATlas portal</a>.
+  222 scATAC-seq bigWigs from human tissues can be downloaded from the <a href="https://decoder-genetics.wustl.edu/catlasv1/catlas_downloads/humantissues/Bigwig/">CATlas portal</a>. Note that these need to be reverse normalised as they have previously been normalised by Signal Per Million Reads (SPMR).
   
 </details>
 
 <a id=""></a>
 <details open="open">
   <summary><b>Erythroid CTCF ChIP-seq</b></summary>
-  This data by E. Georgiades et al. (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE244929">GSE244929</a>)
+  This data by E. Georgiades et al. includes CTCF ChIP-seq from three donors (donors 1, 2 and 30) without replicates (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE244929">GSE244929</a>).
 
 </details>
 
@@ -49,6 +49,7 @@ replicates each (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE
   This data by CA. Mimoso et al. (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE218127">GSE218127</a>)
 
 </details>
+
 
 
 
