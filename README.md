@@ -170,12 +170,37 @@ To quantify genome-wide performance across normalisation methods, Wasserstein di
 
 <a id="visualising_signal"></a>
 ## 6. Visualising Signal and Zones
-When normalising genomic signal with ZEN, using bigWigs as inputs and outputs allows some steps in the process to be visualised providing greater transparency then count based normalisation methods. For example, bigWigs can be saved after reverse normalisation, smoothing via convolution (useful to view thresholds against this signal) and after normalisation with ZEN. In additon, predicted signal zones (coordinates of consistent regions of signal) can be saved to BED files and visualised in the same way as peak calls. These signals can therefore be viewed using either track plots included in the package, or genome browsers.
+When normalising genomic signal with ZEN, using bigWigs as inputs and outputs allows some steps in the process to be visualised providing greater transparency than count based normalisation methods. For example, bigWigs can be saved after reverse normalisation, smoothing via convolution (useful to view thresholds against this signal) and after normalisation with ZEN. In additon, predicted signal zones (coordinates of consistent regions of signal) can be saved to BED files and visualised in the same way as peak calls. These signals can therefore be viewed using either track plots included in the package, or genome browsers.
 
 <a id=""></a>
 <details open="open">
   <summary><b>Track Plots</b></summary>
-  When running ZEN-norm, regions of signal for one or more samples can be viewed as track plots. These can be customised, for example to view the signal before and after reverse normalisation, to visualise zone thresholds at different parameters, to view signal zones or as shown in the plot below, to check alignment of samples after ZEN normalisation.
+  When running ZEN-norm, regions of signal for one or more samples can be viewed as track plots. These are customisable as demonstrated in the examples below: 
+
+<p></p>
+
+  <ins>Viewing Non-Normalised Signals</ins>
+
+  Signal from one or more samples can be overlaid to view alignment prior to normalisation.
+  
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_Raw_Signal_Plot.png" width="100%"></p>
+  
+  <ins>Comparing Zone Thresholds Against Convoluted Signal</ins>
+
+  After smoothing signal via convolution and distribution fitting, thresholds are derived from the distributions. These can be viewed against the convoluted signal to see how a threshold will separate signal from background noise during signal zone prediction.
+  
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_Convoluted_Signal_Plot.png" width="100%"></p>
+
+  <ins>Viewing Signal Zones</ins>
+
+  After signal zone prediction, zones can be visualised as bars within the track plots.
+
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_Zone_Signal_Plot.png" width="100%"></p>
+
+  <ins>Viewing Normalised Signals</ins>
+  
+  Signal from one or more samples can be overlaid to view alignment after normalisation.
+  
 <p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_ZEN_Signal_Plot.png" width="100%"></p>
 
 </details>
