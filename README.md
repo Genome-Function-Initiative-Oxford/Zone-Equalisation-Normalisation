@@ -35,7 +35,7 @@ ZEN-norm is designed to run on Python 3.10 and above. It is installable from eit
   To install the ZEN-norm package from <a href="https://test.pypi.org/project/ZEN-norm-test/">PyPI</a>, run the command below:
 
 ```
-python -m pip install  --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple ZEN-norm-test
+python -m pip install ZEN-norm
 ```
 </details>
 
