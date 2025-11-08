@@ -72,7 +72,7 @@ conda install zen-norm
 <a id=""></a>
 <details open="open">
   <summary><b>Publication Supplementary Figures</b></summary>
-  A Jupyter notebook is provided in folder <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tutorials/zen_tutorial">tutorial/supplementary_figures</a> to document how the figures were created in the Supplementary section of the ZEN publication.
+  A Jupyter notebook is provided in folder <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tutorials/zen_tutorial">tutorial/supplementary_figures</a> of the GitHub repository to document how the figures were created in the Supplementary section of the ZEN publication.
 </details>
 
 <br>
