@@ -3,8 +3,8 @@ requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ZEN-norm_test"
-version = "0.0.35"
+name = "ZEN-norm"
+version = "0.0.1"
 description = "Zone Equalisation Normalisation: A Python package for bigWig scaling"
 keywords = ["genomics", "genetics", "bioinformatics", "bigwig", "normalisation", "atac-seq", "chip-seq", "tt-seq"]
 authors = [

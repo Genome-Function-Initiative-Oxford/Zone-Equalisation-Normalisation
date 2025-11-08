@@ -9,6 +9,6 @@ __all__ = ["zone_norm", "reverse_norm", "compare_norm"]
 
 try:
     # Set attribute version based on toml file
-    __version__ = version("your-package-name")
+    __version__ = version("ZEN-norm")
 except PackageNotFoundError:
     __version__ = "0.0.0"
