@@ -66,7 +66,7 @@ conda install zen-norm
 <a id=""></a>
 <details open="open">
   <summary><b>Main Tutorial</b></summary>
-  A detailed Jupyter notebook tutorial explaining how to use ZEN for reversing prior normalisation, normalising bigWigs with ZEN and evaluating normalisation methods via Wasserstein distance plots and MA plots is provided within the <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tutorials/zen_tutorial">tutorial/zen_tutorials</a> folder of this repository. For a quick overview of the avaliable features, see <a href="#reverse_norm">sections 3 to 6</a> below.
+  A detailed Jupyter notebook tutorial explaining how to use ZEN for reversing prior normalisation, normalising bigWigs with ZEN and evaluating normalisation methods via Wasserstein distance plots and MA plots is provided within the <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tutorials/zen_tutorial">tutorial/zen_tutorials</a> folder of the GitHub repository. For a quick overview of the avaliable features, see <a href="#reverse_norm">sections 3 to 6</a> below.
 </details>
 
 <a id=""></a>
