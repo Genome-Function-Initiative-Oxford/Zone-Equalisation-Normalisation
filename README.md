@@ -2,7 +2,7 @@
 
 ZEN-norm is a Python package for normalising bigWigs of genomic signal, such as ATAC-seq, ChIP-seq and TT-seq by Zone Equilisation Normalisation (ZEN). This also includes modules for reversing prior bigWig normalisation and creating plots to compare performance of normalisation methods genome-wide.
 
-<p><img src="https://raw.githubusercontent.com/Genome-Function-Initiative-Oxford/ZEN-norm/refs/heads/assets/Images/ZEN_Overview_Figure.png?token=GHSAT0AAAAAADLQKKO3R5BOS4C5USDIGE2I2IPOK5Q" width="100%"></p>
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/ZEN_Overview_Figure.png?raw=True" width="100%"></p>
 
 **Citation:** T. Wilson, TA. Milne, SG. Riva and JR. Hughes, _Zone Equalisation Normalisation For Improved Alignment of Epigenetic Signal_, Unpublished, 2025
 
