@@ -41,7 +41,7 @@ pip install ZEN-norm
 <a id=""></a>
 <details open="open">
   <summary><b>Conda Installation</b></summary>
-  To install the ZEN-norm package from <a href="">Conda</a>, active the conda environment you'd like to install the package into (<code>conda activate ...</code>) and run the command below:
+  To install the ZEN-norm package from <a href="https://anaconda.org/TomMakesThings/zen-norm">Conda</a>, active the conda environment you'd like to install the package into (<code>conda activate ...</code>) and run the command below:
 
 ```
 conda install tommakesthings::zen-norm
