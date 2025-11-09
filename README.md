@@ -44,7 +44,7 @@ pip install ZEN-norm
   To install the ZEN-norm package from <a href="">Conda</a>, active the conda environment you'd like to install the package into (<code>conda activate ...</code>) and run the command below:
 
 ```
-conda install zen-norm
+conda install tommakesthings::zen-norm
 ```
 
   Alternatively, if there are issues installing ZEN-norm, a conda environment with the required packages can be created using the <code>zen_environment.yml</code> file.
