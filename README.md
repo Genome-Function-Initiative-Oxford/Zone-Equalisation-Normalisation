@@ -1,7 +1,7 @@
 # Zone Equalisation Normalisation
 Zone Equilisation Normalisation (ZEN) is a method for normalising bigWigs of genomic signal, such as ATAC-seq, ChIP-seq and TT-seq. ZEN is avaliable within the Python package ZEN-norm, which also includes modules for reversing prior bigWig normalisation and creating plots to compare performance of normalisation methods genome-wide.
 
-<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/ZEN_Overview_Figure.png?raw=True" width="100%"></p>
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/blob/assets/Images/ZEN_Overview_Figure.png?raw=True" width="100%"></p>
 
 **Citation:** T. Wilson, TA. Milne, SG. Riva and JR. Hughes, _Zone Equalisation Normalisation For Improved Alignment of Epigenetic Signal_, Unpublished, 2025
 
@@ -65,13 +65,13 @@ conda install zen-norm
 <a id=""></a>
 <details open="open">
   <summary><b>Main Tutorial</b></summary>
-  A detailed Jupyter notebook tutorial explaining how to use ZEN for reversing prior normalisation, normalising bigWigs with ZEN and evaluating normalisation methods via Wasserstein distance plots and MA plots is provided within the <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tutorials/zen_tutorial">tutorial/zen_tutorials</a> folder of the GitHub repository. For a quick overview of the avaliable features, see <a href="#reverse_norm">sections 3 to 6</a> below.
+  A detailed Jupyter notebook tutorial explaining how to use ZEN for reversing prior normalisation, normalising bigWigs with ZEN and evaluating normalisation methods via Wasserstein distance plots and MA plots is provided within the <a href="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/tree/main/tutorials/zen_tutorial">tutorial/zen_tutorials</a> folder of the GitHub repository. For a quick overview of the avaliable features, see <a href="#reverse_norm">sections 3 to 6</a> below.
 </details>
 
 <a id=""></a>
 <details open="open">
   <summary><b>Publication Supplementary Figures</b></summary>
-  A Jupyter notebook is provided in folder <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tutorials/zen_tutorial">tutorial/supplementary_figures</a> of the GitHub repository to document how the figures were created in the Supplementary section of the ZEN publication.
+  A Jupyter notebook is provided in folder <a href="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/tree/main/tutorials/zen_tutorial">tutorial/supplementary_figures</a> of the GitHub repository to document how the figures were created in the Supplementary section of the ZEN publication.
 </details>
 
 <br>
@@ -152,7 +152,7 @@ To quantify genome-wide performance across normalisation methods, Wasserstein di
   <summary><b>Wasserstein Distance Plots</b></summary>
   Within a Wasserstein distance plot, min-max scaled pairwise sample Wasserstein distance (w) is measured over regions (e.g. peaks or zones) and plotted as violin and / or box plots per normalisation method. The normalisation method with the lowest average w therefore has the best alignment across the genome for regions of interest. For example in the plot below of erythroid ATAC-seq, ZEN has the lowest mean w and it is significantly lower than all other normalisation methods according to a t-test comparing the distributions.
   
-<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_Wasserstein_Plot.jpg" width="70%"></p>
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/blob/assets/Images/Erythroid_ATAC_Wasserstein_Plot.jpg" width="70%"></p>
 
 </details>
 
@@ -161,7 +161,7 @@ To quantify genome-wide performance across normalisation methods, Wasserstein di
   <summary><b>MA Plots</b></summary>
   MA plots compare differences in total signal (M) relative to signal intensity (A) between pairs of samples across regions (e.g. peaks or zones). This is useful to assess how effective a normalisation method is at reducing bias. For example in the HeLa TT-seq plot below, a point in each subplot represents the mean count of the signal over a region's coordinates for two samples after RPKM normalisation. The dotted red line is a reference, whereby the closer the points fall, the closer the average counts are for the samples.
 
-<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/HeLa_TTseq_Reverse_MA_Plot.png" width="100%"></p>
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/blob/assets/Images/HeLa_TTseq_Reverse_MA_Plot.png" width="100%"></p>
 
 </details>
 
@@ -182,25 +182,25 @@ When normalising genomic signal with ZEN, using bigWigs as inputs and outputs al
 
   Signal from one or more samples can be overlaid to view alignment prior to normalisation.
   
-<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_Raw_Signal_Plot.png" width="100%"></p>
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/blob/assets/Images/Erythroid_ATAC_Raw_Signal_Plot.png" width="100%"></p>
   
   <ins>Comparing Zone Thresholds Against Convoluted Signal</ins>
 
   After smoothing signal via convolution and distribution fitting, thresholds are derived from the distributions. These can be viewed against the convoluted signal to see how a threshold will separate signal from background noise during signal zone prediction.
   
-<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_Convoluted_Signal_Plot.png" width="100%"></p>
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/blob/assets/Images/Erythroid_ATAC_Convoluted_Signal_Plot.png" width="100%"></p>
 
   <ins>Viewing Signal Zones</ins>
 
   After signal zone prediction, zones can be visualised as bars within the track plots.
 
-<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_Zone_Signal_Plot.png" width="100%"></p>
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/blob/assets/Images/Erythroid_ATAC_Zone_Signal_Plot.png" width="100%"></p>
 
   <ins>Viewing Normalised Signals</ins>
   
   Signal from one or more samples can be overlaid to view alignment after normalisation.
   
-<p><img src="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/assets/Images/Erythroid_ATAC_ZEN_Signal_Plot.png" width="100%"></p>
+<p><img src="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/blob/assets/Images/Erythroid_ATAC_ZEN_Signal_Plot.png" width="100%"></p>
 
 </details>
 
