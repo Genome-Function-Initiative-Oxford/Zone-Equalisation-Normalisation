@@ -1,13 +1,13 @@
 # ZEN Tutorial
 
 ## About
-<a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/blob/main/tutorials/zen_tutorial/ZEN_Tutorial.ipynb">ZEN_Tutorial.ipynb</a> is a Jupyter notebook with detailed explainations for running bigWig normalisation with ZEN with module `ZoneNorm`, reversing prior bigWig normalisation with `ReverseNorm` and comparing performance of normalisation methods genome-wide with `CompareNorm`. Examples are given across a range of genomic assays using the datasets below.
+<a href="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/blob/main/tutorials/zen_tutorial/ZEN_Tutorial.ipynb">ZEN_Tutorial.ipynb</a> is a Jupyter notebook with detailed explainations for running bigWig normalisation with ZEN with module `ZoneNorm`, reversing prior bigWig normalisation with `ReverseNorm` and comparing performance of normalisation methods genome-wide with `CompareNorm`. Examples are given across a range of genomic assays using the datasets below.
 
 <br>
 
 <a id="example_data"></a>
 ## Example Data
-The following datasets are all publically avaliable and files of URLs can be found in this repository in the <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/data">data</a> folder.
+The following datasets are all publically avaliable and files of URLs can be found in this repository in the <a href="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/tree/main/data">data</a> folder.
 
 <a id=""></a>
 <details open="open">
@@ -86,6 +86,7 @@ wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file
 ```
 
 </details>
+
 
 
 
