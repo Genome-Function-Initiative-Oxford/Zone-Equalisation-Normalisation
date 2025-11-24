@@ -5,7 +5,7 @@
 
 
 ## Example Data
-This notebook uses all the datasets detailed in the <a href="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/tree/main/tutorials/zen_tutorial">main tutorial</a>, as well as additional datasets explained below. For these (except CATlas), BAMs can be created by downloaded FASTQ from NCBI GEO and aligning them to the hg38 genome using the <a href="https://github.com/Genome-Function-Initiative-Oxford/UpStreamPipeline/tree/main/genetics/CATCH-UP">CATCH-UP pipeline</a>.
+This notebook uses all the datasets detailed in the <a href="https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/tree/main/tutorials/zen_tutorial">main tutorial</a>, as well as additional datasets explained below. For these (except CATlas), BAMs can be created by downloaded FASTQ from NCBI GEO and aligning them to the hg38 genome using the <a href="https://github.com/Genome-Function-Initiative-Oxford/UpStreamPipeline/tree/main/genetics/CATCH-UP">CATCH-UP pipeline</a>.
 
 <a id=""></a>
 <details open="open">
@@ -48,7 +48,6 @@ This notebook uses all the datasets detailed in the <a href="https://github.com/
   This data by CA. Mimoso et al. includes TT-seq of the HEK293T embryonic kidney cell line with four replicates (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE218127">GSE218127</a>).
 
 </details>
-
 
 
 
