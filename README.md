@@ -3,7 +3,7 @@ Zone Equilisation Normalisation (ZEN) is a method for normalising bigWigs of gen
 
 <p><img src="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/blob/assets/Images/ZEN_Overview_Figure.png?raw=True" width="100%"></p>
 
-**Citation:** T. Wilson, TA. Milne, SG. Riva and JR. Hughes, _Zone Equalisation Normalisation For Improved Alignment of Epigenetic Signal_, Unpublished, 2025
+**Citation:** T. Wilson, TA. Milne, SG. Riva and JR. Hughes, <a href="https://www.biorxiv.org/content/10.64898/2025.12.10.693203v1">_Zone Equalisation Normalisation For Improved Alignment of Epigenetic Signal_</a>, bioRvix, 2025
 
 <br>
 
