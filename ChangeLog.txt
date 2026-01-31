@@ -1,0 +1,13 @@
+31/01/2026 TomMakesThings
+	Version 0.0.2
+
+	* Minor bug fixes
+	* Gzip compression of temporary CSVs and support for XZ compression
+	* Created function to create binned bigWigs from input bigWigs
+
+08/11/2025 TomMakesThings
+	Version 0.0.1
+		
+	* Initial release of ZEN-norm with features for performing ZEN normalisation, 
+	  reversing prior bigWig normalisation and creating plots to compare performance 
+	  of normalisation methods genome-wide

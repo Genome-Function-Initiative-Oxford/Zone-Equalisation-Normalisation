@@ -97,6 +97,50 @@ class ChromAnalysisCore:
             raise FileNotFoundError(f'Directory is empty: "{directory}"')
 
     @staticmethod
+    def createPairs(samples, sample_groups = {}):
+        """
+        From an array of samples, create another array with all paired combinations without mirrored 
+        repeats. e.g. from ["a", "b", "c"] the pairs are [["a", "b"], ["a", "c"], ["b", "c"]]. If 
+        groups are specified, then a pair will only be created if both values belong to different
+        groups.
+        
+        params:
+            samples:       List or array of sample names / IDs to create pairs for.
+            sample_groups: A dictionary where keys are group names and values are lists of samples 
+                           belonging to each group.
+        """
+
+        samples = np.array(samples)
+
+        # Create all paired combinations
+        unfiltered_pairs = np.array(np.meshgrid(samples, samples)).T.reshape(-1, 2)
+        unfiltered_pairs = unfiltered_pairs[unfiltered_pairs[:, 0] < unfiltered_pairs[:, 1]]
+
+        if len(sample_groups) == 0:
+            # No filtering required if groups not given
+            sample_pairs = np.array(unfiltered_pairs)
+
+        else:
+            # Keep pairs from different groups
+            filtered_pairs = []
+            
+            group_per_sample = {}
+            for group, values in sample_groups.items():
+                for s in values:
+                    group_per_sample[s] = group
+
+            for pair in unfiltered_pairs:
+                group_1 = group_per_sample[pair[0]]
+                group_2 = group_per_sample[pair[1]]
+
+                if group_1 != group_2:
+                    filtered_pairs.append(pair)
+
+            sample_pairs = np.array(filtered_pairs)
+
+        return sample_pairs
+
+    @staticmethod
     def naturalSort(values, return_idxs = False):
         """
         Sort strings with numbers inside,
@@ -342,8 +386,9 @@ class ChromAnalysisCore:
             chrom_sizes[str(chrom)] = int(size_values[-1])
                 
         if (self.verbose > 0):
-            if len(unmatched_chroms) > 0:
-                print(f"Warning: {len(unmatched_chroms)} chromosome(s) were found to have differing "
+            n_unmatched_chroms = len(unmatched_chroms)
+            if n_unmatched_chroms > 0:
+                print(f"Warning: {n_unmatched_chroms} chromosome{'s' if n_unmatched_chroms != 1 else ''} have different "
                       f"sizes across samples: "
                       f'{", ".join(i for i in unmatched_chroms)}')
 
@@ -380,6 +425,7 @@ class ChromAnalysisCore:
         else:
             message_postfix = ""
 
+        # Open the bigWig
         bigwig = pyBigWig.open(bigwig_file)
         bigwig_chroms = bigwig.chroms()
 
@@ -585,11 +631,10 @@ class ChromAnalysisExtended(ChromAnalysisCore):
         if (len(self.bigwig_paths) == 0) and (len(self.wig_paths) == 0):
             if allow_bams:
                 if (len(self.bam_paths) == 0):
-                    raise ValueError("Either BAM, bigWig or wig files need to be given by setting one "
-                                     "of: bam_paths, bam_directory, bigwig_paths, bigwig_directory")
+                    raise ValueError("Either BAM, bigWig or wig files need to be given by setting "
+                                     "either bam_paths or bigwig_paths")
             else:
-                raise ValueError("Either bigWig or wig files need to be given by setting bigwig_paths "
-                                 "or bigwig_directory")
+                raise ValueError("Either bigWig or wig files need to be given by setting bigwig_paths ")
 
         if allow_bams and (len(self.bam_paths) > 0):
             # Derive sample names from BAM files
@@ -1073,13 +1118,13 @@ class ChromAnalysisExtended(ChromAnalysisCore):
     def openDefaultSignal(self, bw_idx, chromosome, signal_type = ""):
         raise ValueError("openDefaultSignal not specified")
 
-    def saveBigWig(self, bw_idx = None, custom_sample_name = "", file_name = "", directory = "", 
-                   signal_type = "", signals = [], chrom_sizes = {}):
+    def saveBigWig(self, file_name, directory, bw_idx = None, custom_sample_name = "", signal_type = "", signals = [], 
+                   chrom_sizes = {}):
         """
         Save a signal to a bigWig file.
 
         params: 
-            bw_idx:             Index of sample to save to file.
+            bw_idx:             Sample ID to save to file.
             custom_sample_name: If file name not set, can specify an alternative name for the same.
             file_name:          Name of bigWig file to save signal to.
             directory:          Full directory with folder to save the file to.
@@ -1096,6 +1141,16 @@ class ChromAnalysisExtended(ChromAnalysisCore):
         """
 
         n_signals = len(signals)
+
+        if file_name == "":
+            raise ValueError("saveBigWig requires a file name, but none was given")
+        
+        if directory == "":
+            raise ValueError("saveBigWig requires a directory, but none was given")
+            
+        if not(file_name.endswith(".bw") or file_name.endswith(".bigWig")):
+            file_name = file_name + ".bw"
+        file_name = os.path.join(directory, file_name)
 
         if (bw_idx is None):
             if n_signals == 0:
@@ -1119,16 +1174,6 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             sample_name = self.getSampleNames(return_custom = True)[bw_idx]
         else:
             sample_name = custom_sample_name
-
-        if file_name == "":
-            raise ValueError("saveBigWig requires a file name, but none was given")
-        
-        if directory == "":
-            raise ValueError("saveBigWig requires a directory, but none was given")
-            
-        if not(file_name.endswith(".bw") or file_name.endswith(".bigWig")):
-            file_name = file_name + ".bw"
-        file_name = os.path.join(directory, file_name)
 
         if self.verbose > 0:
             print(f'Saving signal for {sample_name} to bigWig "{file_name}"')
@@ -1537,7 +1582,7 @@ class ChromAnalysisExtended(ChromAnalysisCore):
 
             if len(missing_samples) > 0:
                 raise ValueError(f"Unknown sample name{'s' if len(missing_samples) > 0 else ''}: "
-                                f"{', '.join(chr(34) + s + chr(34) for s in missing_samples)}")
+                                f"{chr(34)}{', '.join(chr(34) + s + chr(34) for s in missing_samples)}{chr(34)}")
 
         elif not isinstance(signals, dict):
             raise ValueError("signals must be set as a dictionary of signal names and arrays, or "
@@ -1549,7 +1594,8 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             # Derive signal names from signals dictionary
             plot_signals = list(signals.keys())
         
-        plot_signal_idxs = np.arange(len(plot_signals))
+        n_samples = len(plot_signals)
+        plot_signal_idxs = np.arange(n_samples)
 
         if not isinstance(self.chrom_sizes, dict):
             raise ValueError("chrom_sizes was not set")
@@ -1575,7 +1621,7 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             if not isinstance(bar_regions, list):
                 raise ValueError("bar_regions must be given as a list of arrays")
             elif n_bar_regions > 1:
-                if (not same_y_axis) or (len(bar_regions) != len(plot_signals)):
+                if (not same_y_axis) or (len(bar_regions) != n_samples):
                     raise ValueError("Number of bar regions and number of samples to plot does not match")
                 
             if not isinstance(bar_label, str):
@@ -1626,14 +1672,21 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             elif y_intercept_colour is not None:
                 raise ValueError("y_intercept_colour must be either a string, list or array")
 
-        if len(custom_colours) == len(plot_signals):
+        trace_colour_dict = {}
+
+        if len(custom_colours) == n_samples:
             # Create dictionary mapping custom colours to samples to plot
             trace_colour_dict = dict(zip(plot_signals, custom_colours))
-        else:
-            if self.verbose > 0 and len(custom_colours) > 0:
-                print(f"Warning: cannot map {len(custom_colours)} "
-                      f"custom colours to {len(plot_signals)} samples")
+
+        elif len(custom_colours) > n_samples:
+             trace_colour_dict = dict(zip(plot_signals, custom_colours[:n_samples]))
+
+        elif (len(custom_colours) > 0) and (self.verbose > 0):
+            print(f"Warning: cannot map {len(custom_colours)} "
+                  f"custom colours to {n_samples} sample{'s' if n_samples != 1 else ''}")
                 
+                
+        if len(trace_colour_dict) == 0:
             # Create list of hex colours to represent all samples
             trace_colours = np.array(list(color_palette("bright", len(plot_signals)).as_hex()))
             # Convert to dictionary mapping samples to plot with their colour
@@ -1665,13 +1718,16 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                                                              pad_end = True,
                                                              return_file = True) for bw_idx in plot_bw_idxs]
                 
-                for process in as_completed(read_signal_processes):
-                    # Get the signal and the file as an identifier
-                    bigwig_file, signal = process.result()
-                    # Convert file into signal index
-                    bw_idx = np.where(self.bigwig_paths == bigwig_file)[0][0]
-                    row_idx = np.where(plot_bw_idxs == bw_idx)[0][0]
-                    signals[row_idx] = signal
+                    for process in as_completed(read_signal_processes):
+                        # Get the signal and the file as an identifier
+                        bigwig_file, signal = process.result()
+                        # Convert file into signal index
+                        bw_idx = np.where(self.bigwig_paths == bigwig_file)[0][0]
+                        row_idx = np.where(plot_bw_idxs == bw_idx)[0][0]
+                        signals[row_idx] = signal
+
+                    if self.checkParallelErrors(read_signal_processes):
+                        raise RuntimeError("plotTracks failed to complete. To debug, see trace above.")
         else:
             # Convert to numpy array
             signals = np.vstack(list(signals.values()))

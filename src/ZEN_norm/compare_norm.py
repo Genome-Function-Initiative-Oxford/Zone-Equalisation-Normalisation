@@ -443,22 +443,6 @@ class CompareNorm(ChromAnalysisCore):
             return np.array(regex_sample_pairs)
         else:
             return np.array(regex_samples)
-
-    @staticmethod
-    def createPairs(samples):
-        """
-        From an array of samples, create another array with all paired combinations without mirrored 
-        repeats. e.g. from ["a", "b", "c"] the pairs are [["a", "b"], ["a", "c"], ["b", "c"]].
-        
-        params:
-            samples: Array of sample names or IDs to create pairs for.
-        """
-
-        # Create all paired combinations
-        sample_pairs = np.array(np.meshgrid(samples, samples)).T.reshape(-1, 2)
-        sample_pairs = sample_pairs[sample_pairs[:, 0] < sample_pairs[:, 1]]
-
-        return sample_pairs
         
     @staticmethod
     def createBigWigFileCSV(sample_names, bigwig_directory, norm_methods, file_extension = ".bw", 
@@ -923,7 +907,7 @@ class CompareNorm(ChromAnalysisCore):
                     counts[chrom][bw_idx] = results
 
                 if self.checkParallelErrors(processes):
-                    return None
+                    raise RuntimeError("calculateCoordCounts failed to complete. To debug, see trace above.")
 
         else:
             for chrom in chromosomes:
@@ -1445,7 +1429,7 @@ class CompareNorm(ChromAnalysisCore):
                     wasserstein_dists[norm_method].extend(list(dist.values()))
 
                 if self.checkParallelErrors(processes):
-                    return None
+                    raise RuntimeError("plotWasserstein failed to complete. To debug, see trace above.")
         else:
             for norm_method in norm_methods:
                 wasserstein_dists[norm_method] = []

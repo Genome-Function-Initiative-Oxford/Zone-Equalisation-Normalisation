@@ -41,7 +41,7 @@ class ReverseNorm(ChromAnalysisExtended):
 
         # Add output folders
         self.output_directories["bigwig"] = os.path.join(self.output_directories["results"], 
-                                                         "Reverse_Normalised", "BigWigs")
+                                                         "BigWigs", "Reverse_Normalised")
 
         # Use to hold divisors per sample
         self.divisors = {}
@@ -197,7 +197,7 @@ class ReverseNorm(ChromAnalysisExtended):
                         contain_floats[bw_idx] = found_float
 
             if self.checkParallelErrors(processes):
-                return None
+                raise RuntimeError("estimateFragmentSizes failed to complete. To debug, see trace above.")
             
         else:
             for chrom in chromosomes:
@@ -335,6 +335,7 @@ class ReverseNorm(ChromAnalysisExtended):
                                     directory = self.output_directories["bigwig"])
                     
         if self.n_cores > 1:
-            self.checkParallelErrors(processes)
+            if self.checkParallelErrors(processes):
+                raise RuntimeError("runReversal failed to complete. To debug, see trace above.")
 
         print("Finished saving bigWigs")
