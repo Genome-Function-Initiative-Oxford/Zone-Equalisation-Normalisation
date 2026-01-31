@@ -14,11 +14,7 @@ import sympy as sp
 from scipy.special import expi
 from scipy import stats
 from concurrent.futures import ProcessPoolExecutor, as_completed
-# from ZEN_norm.chrom_analysis import ChromAnalysisExtended
-#from .chrom_analysis import ChromAnalysisExtended
-
-os.chdir("/ceph/project/Wellcome_Discovery/towilson/Projects/ZEN-norm/PyPI/src/ZEN_norm/")
-from chrom_analysis import ChromAnalysisExtended
+from .chrom_analysis import ChromAnalysisExtended
 
 #####################################
 # Main class for bigWig normalisation
