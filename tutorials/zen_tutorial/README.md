@@ -12,7 +12,7 @@ The following datasets are all publically avaliable and files of URLs can be fou
 <a id=""></a>
 <details open="open">
   <summary><b>Erythroid ATAC-seq</b></summary>
-  This data consists of bulk ATAC-seq from two healthy day 13 erythroid donors (donors 2 and 3), each with seven technical replicates. Either BAMs (as used in the tutorial), or non-normalised bigWigs can be downloaded by command line:
+  This data consists of bulk ATAC-seq from two healthy day 13 erythroid donors (donors 2 and 3), each with seven technical replicates (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE311157">GSE311157</a>). Either BAMs (as used in the tutorial), or non-normalised bigWigs can be downloaded by command line:
 
   <br>
   
@@ -34,7 +34,7 @@ wget -i tests/data/Erythroid_ATAC_bigWig_URLs.txt
 <a id=""></a>
 <details open="open">
   <summary><b>Erythroid RAD21 ChIP-seq</b></summary>
-  This data by E. Georgiades et al (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE244929">GSE244929</a>) consists of RAD21 ChIP-seq from three healthy day 13 erythroid donors (donors 1, 2, and 30), each with three replicates. Either BAMs, or non-normalised bigWigs (as used in the tutorial) can be downloaded by command line:
+  This data by E. Georgiades et al consists of RAD21 ChIP-seq from three healthy day 13 erythroid donors (donors 1, 2, and 30), each with three replicates (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE244929">GSE244929</a>). Either BAMs, or non-normalised bigWigs (as used in the tutorial) can be downloaded by command line:
 
   <ins>BAMs</ins>
 ```
@@ -86,6 +86,7 @@ wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3399494&format=file&file
 ```
 
 </details>
+
 
 
 
