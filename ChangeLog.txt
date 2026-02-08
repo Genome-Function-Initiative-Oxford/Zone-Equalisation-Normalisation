@@ -1,9 +1,10 @@
-31/01/2026 TomMakesThings
-	Version 0.0.2
+08/02/2026 TomMakesThings
+	Version 0.0.2 [Unreleased]
 
 	* Minor bug fixes
 	* Gzip compression of temporary CSVs and support for XZ compression
 	* Created function to create binned bigWigs from input bigWigs
+	* Added support for rescaling bigWigs by custom sample-specific scaling factors
 
 08/11/2025 TomMakesThings
 	Version 0.0.1
