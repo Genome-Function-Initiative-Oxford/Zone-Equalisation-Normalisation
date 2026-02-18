@@ -5,6 +5,7 @@
 	* Gzip compression of temporary CSVs and support for XZ compression
 	* Created function to create binned bigWigs from input bigWigs
 	* Added support for rescaling bigWigs by custom sample-specific scaling factors
+	* Added more supported significance tests for Wasserstein distribution plots, removing independent t-test and replacing the default
 
 08/11/2025 TomMakesThings
 	Version 0.0.1
