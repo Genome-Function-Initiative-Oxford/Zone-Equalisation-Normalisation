@@ -2,9 +2,12 @@
 	Version 0.0.2 [Unreleased]
 
 	* Minor bug fixes
+	* Major bux fix for running predictSignalZones with one core
 	* Gzip compression of temporary CSVs and support for XZ compression
-	* Created function to create binned bigWigs from input bigWigs
+	* New function for creating binned bigWigs from input bigWigs
 	* Added support for rescaling bigWigs by custom sample-specific scaling factors
+	* Added more significance test options for Wasserstein distribution plots
+	* Independent t-test removed from Wasserstein distribution plots and default set as TBC
 
 08/11/2025 TomMakesThings
 	Version 0.0.1
