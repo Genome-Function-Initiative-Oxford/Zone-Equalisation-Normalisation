@@ -10,26 +10,33 @@ import gzip
 import lzma
 import matplotlib.pyplot as plt
 import subprocess
+import importlib.util
 import sympy as sp
 from scipy.special import expi
 from scipy import stats
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from .chrom_analysis import ChromAnalysisExtended
+# from ZEN_norm.chrom_analysis import ChromAnalysisExtended
+#from .chrom_analysis import ChromAnalysisExtended
+
+os.chdir("/ceph/project/Wellcome_Discovery/towilson/Projects/ZEN-norm/PyPI/src/ZEN_norm/")
+from chrom_analysis import ChromAnalysisExtended
 
 #####################################
 # Main class for bigWig normalisation
 #####################################
 
 class ZoneNorm(ChromAnalysisExtended):
-    # deepTools bamCoverage normalisation
-    bam_norm_methods = ["RPKM", "CPM", "BPM", "RPGC"]
+    # deepTools bamCoverage normalisation and spike-in
+    deeptools_norm_methods = ["RPKM", "CPM", "BPM", "RPGC"]
+    bam_norm_methods = deeptools_norm_methods + ["Scalar", "Spike-in"]
     # Inbuilt normalisation methods and other transformations
-    bigwig_norm_methods = ["ZEN", "Power", "Log"]
+    bigwig_norm_methods = ["ZEN", "Scalar", "Power", "Log"]
 
     # Allow only supported normalisation methods
     supported_norm_methods = ["No normalisation"]
     supported_norm_methods.extend(bam_norm_methods)
     supported_norm_methods.extend(bigwig_norm_methods)
+    supported_norm_methods = np.unique(supported_norm_methods)
 
     # Allow normalisation against these options
     supported_norm_stats_types = ["signal",
@@ -59,17 +66,19 @@ class ZoneNorm(ChromAnalysisExtended):
     compress_extensions = {"gzip": ".gz", "xz": ".xz"}
 
     __slots__ = ("chrom_sizes_file", "interleave_sizes", "norm_method", "genome_size", "extend_reads", 
-                 "filter_strand", "exclude_zero", "zone_remove_percent", "norm_stats_type", 
+                 "filter_strand", "exclude_zero", "spikein_prefix", "spikein_reads", "zone_remove_percent", 
+                 "norm_stats_type", 
                  "norm_power", "scaling_factors", "deletion_size", "downsample_size", "downsample_seed", 
                  "kernel", "test_distributions", "log_transform", "zone_distribution", "zone_param_type", 
                  "best_zone_distribution", "zone_probability", "bin_size", "extend_n_bins", 
                  "merge_depth", "min_region_bps", "quality_filter", "min_different_bps")
     def __init__(self, bam_paths = [], bigwig_paths = [], chromosomes = [], chrom_sizes_file = None, 
                  interleave_sizes = True, sample_names = [], blacklist = "", norm_method = "ZEN", 
-                 genome_size = None, extend_reads = False, filter_strand = False, exclude_zero = True, 
+                 genome_size = None, extend_reads = False, filter_strand = False, spikein_prefix = "",
+                 exclude_zero = True, 
                  zone_remove_percent = 10, norm_stats_type = "signal_padded_sample_zones",
-                 norm_power = None, deletion_size = 500, downsample_size = 300, downsample_seed = 0,
-                 kernel = [], test_distributions = ["laplace"], log_transform = True, 
+                 scaling_factors = {}, norm_power = None, deletion_size = 500, downsample_size = 300,
+                 downsample_seed = 0, kernel = [], test_distributions = ["laplace"], log_transform = True, 
                  zone_distribution = "laplace", zone_param_type = "median_fit", 
                  zone_probability = 0.995, bin_size = 1000, extend_n_bins = 1, merge_depth = 5, 
                  min_region_bps = 35, quality_filter = True, min_different_bps = 5, 
@@ -95,12 +104,14 @@ class ZoneNorm(ChromAnalysisExtended):
                                  e.g. accessing sample_names would return 
                                  {"cntrl_s1": "Control Sample", "flt3_inhibitor_s1": "Treated Sample"}.
             blacklist:           File path to blacklist file with chromosome coordinates to exclude.
-            norm_method:         Signal Normalisation method to apply, i.e. "ZEN", "Power", "Log", 
-                                 "No normalisation" (bigWig/BAM) or "RPKM", "CPM", "BPM", "RPGC" (BAM).
+            norm_method:         Signal Normalisation method to apply, i.e. "ZEN", "Scalar", "Power",
+                                 "Log", "No normalisation" (bigWig/BAM) or "RPKM", "CPM", "BPM", "RPGC", 
+                                 "Spike-in" (BAM).
             genome_size:         Required if using "RPGC" BAM normalisation. Can be set as either an 
                                  integer, or "hg19", "grch37", "hg38", "grch38", "t2t", "chm13cat_v2",
                                  "mm9", "grcm37", "mm10", "grcm38", "mm39", "grcm39", "dm3", "dm6",
-                                 "danrer10":, "grcz10", "danrer11", "grcz11", "wbcel235" or "tair10".
+                                 "danrer10":, "grcz10", "danrer11", "grcz11", "wbcel235", "tair10" or 
+                                 "sacCer3".
             extend_reads:        Whether to enable read extension when creating bigWigs from BAMs with 
                                  deepTools.
             filter_strand:       Specifies whether to separated reads by strand when creating bigWigs 
@@ -108,6 +119,12 @@ class ZoneNorm(ChromAnalysisExtended):
                                  reverse strand bigWig per BAM (e.g. for nascent transcription). 
                                  Leaving as False will disable strand filtering. Setting this as 
                                  "forward" or "reverse" will extract the specified strand per BAM.
+            spikein_prefix:      If spike-in was used in the experiment and BAMs mapped to a combined 
+                                 genome are given, this parameter can be set as the chromosome name 
+                                 prefix to separate the chromosomes by organism. For example, with a 
+                                 combined human ("chr1", "chr2", ...) and yeast genome 
+                                 ("sacCer3_chrI", "sacCer3_chrII", ...,), yeast chromosomes are 
+                                 identifiable by their prefix "sacCer3".
             exclude_zero:        Whether to ignore zeros when calculating statistics within signal 
                                  zones.
             zone_remove_percent: Set as a value greater than zero to ignore an upper and lower 
@@ -125,6 +142,8 @@ class ZoneNorm(ChromAnalysisExtended):
                                  "signal_unpadded_merged_zones", which use zone coordinates merged 
                                  across all samples, or "signal", which considers all signal for 
                                  statistics calculations.
+            scaling_factors:     If norm_method is set as "Scalar", set this as a number to multiple all 
+                                 samples signal by, or a dictionary mapping sample names to numbers.
             norm_power:          If norm_method is set as "Power", set this as a number to raise 
                                  signal to the power of.
             deletion_size:       Threshold number of consecutive zeros in the signal for a region to be 
@@ -196,6 +215,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                    "bed": os.path.join(results_dir, "BED"),
                                    "bigbed": os.path.join(results_dir, "BigBED"),
                                    "output_stats": os.path.join(results_dir, "Stats"),
+                                   "merged_bigwig": os.path.join(results_dir, "BigWigs", "Merged"),
                                    "binned_bigwig": os.path.join(results_dir, "BigWigs", "Binned"),
                                    "smooth_bigwig": os.path.join(results_dir, "BigWigs", "Smooth"),
                                    "missing_csv": os.path.join(results_dir, "Missing_Signal"),
@@ -203,13 +223,10 @@ class ZoneNorm(ChromAnalysisExtended):
 
         self.setInterleaveSizes(interleave_sizes)
         self.setGenomeSize(genome_size)
-        self.setNormMethod(norm_method, norm_power)
-
-        # Scaling factors not yet set
-        self.scaling_factors = {}
-
         self.setExtendReads(extend_reads)
         self.setFilterStrand(filter_strand)
+        self.setSpikeInPrefix(spikein_prefix)
+        self.setNormMethod(norm_method, norm_power, scaling_factors)
         self.setExcludeZero(exclude_zero)
         self.setZoneRemovePercent(zone_remove_percent)
         self.setNormStatsType(norm_stats_type)
@@ -321,7 +338,8 @@ class ZoneNorm(ChromAnalysisExtended):
                                    "danrer11": 1368780147,
                                    "grcz11": 1368780147,
                                    "wbcel235": 100286401,
-                                   "tair10": 119482012}
+                                   "tair10": 119482012,
+                                   "sacCer3": 12157105}
 
                 if genome_size in genome_size_map:
                     self.genome_size = genome_size_map[genome_size]
@@ -338,7 +356,112 @@ class ZoneNorm(ChromAnalysisExtended):
         else:
             self.genome_size = None
 
-    def setNormMethod(self, norm_method, norm_power = None):
+    def setSpikeInPrefix(self, spikein_prefix):
+        """
+        Check the spike-in prefix is valid for identifying chromosomes.
+
+        params:
+            spikein_prefix: Chromosome name prefix of spike-in.
+        """
+
+        if not isinstance(spikein_prefix, str) or not spikein_prefix:
+            self.spikein_prefix = None
+            self.spikein_reads = {}
+            return None
+
+        if len(self.bam_paths) == 0:
+            raise ValueError("BAMs must be given if using spike-in")
+        
+        spikein_chroms = {}
+        missing_chroms = []
+        missing_spikein = []
+
+        for sample_id, bam_file in zip(self.sample_ids, self.bam_paths):
+            # Find all chromosomes within the BAM
+            bam_chroms = self.findBamChroms(bam_file)
+
+            if len(bam_chroms) == 0:
+                missing_chroms.append(bam_file)
+                continue
+
+            # Find spike-in chromosomes
+            bam_spikein_chroms = []
+
+            for chrom in bam_chroms:
+                if chrom.startswith(spikein_prefix):
+                    bam_spikein_chroms.append(chrom)
+
+            if len(bam_spikein_chroms) == 0:
+                missing_spikein.append(bam_file)
+            else:
+                spikein_chroms[sample_id] = bam_spikein_chroms
+
+        # Validate that each BAM has spike-in chromosomes
+        n_missing_chroms = len(missing_chroms)
+        n_missing_spikein = len(missing_spikein)
+
+        error_message = ""
+
+        if n_missing_chroms > 0:
+            if n_missing_chroms == 1:
+                error_message = f"1 BAM has no chromosomes in the header:\n{missing_chroms[0]}"
+            else:
+                error_message = f"{n_missing_chroms} BAMs have no chromosomes in their headers:\n"
+                error_message += ",\n".join(missing_chroms)
+
+        if n_missing_spikein > 0:
+            if error_message:
+                error_message += "\n"
+
+            if n_missing_spikein == 1:
+                error_message += f"1 BAM is missing spike-in chromosomes with prefix\n"
+                error_message += f"{spikein_prefix}: {missing_spikein[0]}"
+            else:
+                error_message += f"{n_missing_spikein} BAMs are missing spike-in chromosomes "
+                error_message += f"with prefix {chr(34)}{spikein_prefix}{chr(34)}:\n"
+                error_message += ",\n".join(missing_spikein)
+
+        if error_message:
+            raise ValueError(error_message)
+
+        if self.verbose > 0:
+            print("Counting spike-in BAM reads")
+
+        # Get set of chromosomes from the spike-in organism
+        all_spikein_chroms = np.unique([chrom for chroms in spikein_chroms.values() for chrom in chroms])
+        # Count reads per spike-in chromosome for each sample
+        n_samples = len(self.sample_ids)
+        spikein_reads = {chrom: np.zeros(n_samples, dtype = np.uint32) for chrom in all_spikein_chroms}
+
+        for sample_id, bam_file in zip(self.sample_ids, self.bam_paths):
+            for chrom in spikein_chroms[sample_id]:
+                chrom_reads = self.countBamReads(bam_file = bam_file,
+                                                 subprocess_cores = self.n_cores,
+                                                 chromosome = chrom,
+                                                 unique_reads = False,
+                                                 filter_strand = self.filter_strand)
+                spikein_reads[chrom][sample_id] = chrom_reads
+
+        self.spikein_prefix = spikein_prefix
+        self.spikein_reads = spikein_reads
+
+    def setNormMethod(self, norm_method, norm_power = None, scaling_factors = {}):
+        """
+        Set the normalisation method to apply and its parameters.
+
+        params:
+            norm_method:     Signal Normalisation method to apply, i.e. "ZEN", "Scalar", "Power",
+                             "Log", "No normalisation" (bigWig/BAM) or "RPKM", "CPM", "BPM", "RPGC" 
+                             (BAM).
+            norm_power:      If norm_method is set as "Power", set this as a number to raise 
+                             signal to the power of.
+            scaling_factors: If norm_method is set as "Scalar", set this as a number to multiple all 
+                             samples signal by, or a dictionary mapping sample names to numbers.
+        """
+
+        # Scaling factors not yet set
+        self.scaling_factors = {}
+
         if (norm_method is None) or (norm_method == "") or (norm_method.lower()[:2] == "no"):
             self.norm_method = "No normalisation"
         else:
@@ -350,11 +473,45 @@ class ZoneNorm(ChromAnalysisExtended):
                     raise ValueError("genome_size must be set to use RPGC normalisation with "
                                      "deepTools bamCoverage")
 
-            if self.norm_method == "SQUARE" or self.norm_method == "SQUARED":
+            if self.norm_method.startswith("SPIKE"):
+                if self.spikein_prefix is None:
+                    raise ValueError("spikein_prefix must be set to use spike-in normalisation")
+
+                self.norm_method = "Spike-in"
+
+                # Count total read counts across spike-in chromosomes per sample
+                total_spikein_reads = self.getTotalSpikeInReads()
+                # Divide to get Reads Per Million (RPM) mapped reads
+                rpm_spikein_reads = 1000000 / total_spikein_reads
+
+                # Set scaling factors as spike-in RPM read counts
+                self.scaling_factors = dict(zip(self.getSampleNames(return_custom = False),
+                                                rpm_spikein_reads))
+
+            if self.norm_method.startswith("SCAL"):
+                self.norm_method = "Scalar"
+
+                if isinstance(scaling_factors, dict):
+                    self.scaling_factors = scaling_factors
+
+                else:
+                    try:
+                        scaling_factors = float(scaling_factors)
+                        self.scaling_factors = scaling_factors
+                    except:
+                        raise ValueError("To linearly transform signal by a scalar, scaling_factors "
+                                         "must be set as either a number or a dictionary mapping sample "
+                                         "names to scaling factors. "
+                                         "e.g. to multiple all sample signal by 2, set scaling_factors = 2. "
+                                         "For sample-specific scaling, e.g. scale one sample by 2.1 and "
+                                         "another by 3.5, set scaling_factors = "
+                                         "{{'sample_1': 2.1, 'sample_2': 3.5}}.")
+
+            if self.norm_method.startswith("SQUARE"):
                 self.norm_method = "Power"
                 self.norm_power = 2
 
-            elif self.norm_method == "CUBE" or self.norm_method == "CUBED":
+            elif self.norm_method.startswith("CUBE"):
                 self.norm_method = "Power"
                 self.norm_power = 3
 
@@ -363,7 +520,7 @@ class ZoneNorm(ChromAnalysisExtended):
                     self.norm_power = float(norm_power)
                 except:
                     raise ValueError("To transform signal by a power, norm_power must be specified. "
-                                     "For example, to square signal, set norm_power = 2.")
+                                     "e.g. to square signal, set norm_power = 2.")
                 
                 self.norm_method = "Power"
 
@@ -371,7 +528,7 @@ class ZoneNorm(ChromAnalysisExtended):
                 self.norm_method = "Log"
 
             if len(self.bam_paths) == 0:
-                if self.norm_method in self.bam_norm_methods:
+                if (self.norm_method in self.bam_norm_methods) and (self.norm_method not in self.bigwig_norm_methods):
                     raise ValueError(f"{self.norm_method} is only supported for BAM files")
 
         if self.norm_method not in self.supported_norm_methods:
@@ -495,20 +652,27 @@ class ZoneNorm(ChromAnalysisExtended):
             print(f"Updating log tranformation as {log_transform}")
 
     def setDownsampleSize(self, downsample_size, verbose = 0):
-        try:
-            # Set downsample size
-            downsample_size = int(downsample_size)
+        if downsample_size is None:
+            self.downsample_size = None
 
-            if downsample_size < 100:
-                print("downsample_size is too small. Setting as the default of 300.")
-                downsample_size = 300
-            
-            self.downsample_size = downsample_size
-        except:
-            raise ValueError("downsample_size must be set as an integer 100 or more")
+            if verbose > 0:
+                print(f"Set to disable downsampling")
 
-        if verbose > 0:
-            print(f"Updating downsample size as {downsample_size}")
+        else:
+            try:
+                # Set downsample size
+                downsample_size = int(downsample_size)
+
+                if downsample_size < 100:
+                    print("downsample_size is too small. Setting as the default of 300.")
+                    downsample_size = 300
+                
+                self.downsample_size = downsample_size
+            except:
+                raise ValueError("downsample_size must be set as an integer 100 or more")
+
+            if verbose > 0:
+                print(f"Setting downsample size as {downsample_size}")
 
     def setDownsampleSeed(self, downsample_seed):
         try:
@@ -599,10 +763,59 @@ class ZoneNorm(ChromAnalysisExtended):
                 # Default to applying a quality filter
                 self.quality_filter = True
 
+    @staticmethod
+    def countBamReads(bam_file, subprocess_cores = 1, chromosome = "", unique_reads = True, 
+                      filter_strand = ""):
+        """
+        Use samtools to count the number of reads in a BAM.
+
+        params:
+            bam_file:           BAM file to process.
+            chromosome:         Set as a chromosome to count reads only from a chromosome.
+            unique_reads:       Set as True to count uniquely mapped reads, or False for all 
+                                reads.
+            filter_strand:      Leave empty to disable strand filtering, or set as "forward" 
+                                or "reverse".
+        """
+
+        command = ["samtools", "view", "-c", "-@", str(subprocess_cores)]
+        require_flag = 0
+        exclude_flag = 4
+
+        if unique_reads:
+            # Count number of uniquely mapped reads (MAPQ > 1) in BAM
+            command.extend(["-q", "1"])
+
+        if filter_strand == "forward":
+            # Keep only forward strand reads
+            exclude_flag = exclude_flag | 16
+        elif filter_strand == "reverse":
+            # Keep only reverse strand reads
+            require_flag = require_flag | 16
+
+        if exclude_flag:
+            command.extend(["-F", str(exclude_flag)])
+        if require_flag:
+            command.extend(["-f", str(require_flag)])
+
+        command.append(bam_file)
+
+        if isinstance(chromosome, str):
+            if chromosome:
+                if len(chromosome.split(" ")) != 1:
+                    raise ValueError("chromosome must be set a string with one chromosome")
+                
+                command.append(chromosome)
+
+        result = subprocess.run(command, capture_output = True, text = True, check = True)
+
+        read_count = int(result.stdout.strip())
+        return read_count
 
     def runBamCoverage(self, bam_file, bigwig_file, subprocess_cores, extend_reads, norm_method, 
                        scale_factor = 1, effective_genome_size = 0, filter_strand = "", 
-                       bin_size = 1, sample_name = None, subprocess_verbose = None):
+                       spikein_prefix = "", bin_size = 1, sample_name = None, 
+                       subprocess_verbose = None):
         """
         Create a bigWig from a BAM using deepTools bamCoverage.
         
@@ -619,39 +832,65 @@ class ZoneNorm(ChromAnalysisExtended):
                                    or "reverse". 
                                    Filtering by reverse signal will create negative signal (if 
                                    scale_factor is not set).
+            spikein_prefix:        Chromosome name prefix of spike-in.
             bin_size:              Base pair resolution of coverage track.
             sample_name:           Sample name can be provided for printing progress message.
             subprocess_verbose:    Verbose of stdout when running subprocess.
         """
 
         # Set the bamCoverage command
-        command = f"bamCoverage -b {bam_file} -o {bigwig_file} -bs {bin_size} "
-        command += f"--numberOfProcessors {subprocess_cores}"
+        command = ["bamCoverage", "-b", str(bam_file), "-o", str(bigwig_file), "-bs", str(bin_size),
+                   "--numberOfProcessors", str(subprocess_cores)]
 
         # Add additional parameters
         if extend_reads:
-            command += " --extendReads"
+            command.append("--extendReads")
 
-        if norm_method != "No Normalisation":
-            command += f" --normalizeUsing {norm_method}"
+        if norm_method not in ["Scalar", "Spike-in", "No Normalisation"]:
+            if norm_method in self.deeptools_norm_methods:
+                command.extend(["--normalizeUsing", str(norm_method)])
+
+                if spikein_prefix:
+                    bam_chroms = self.findBamChroms(bam_file)
+
+                    if len(bam_chroms) == 0:
+                        raise ValueError(f"BAM {bam_file} has no chromosomes in the header")
+
+                    spikein_chroms = []
+
+                    for chrom in bam_chroms:
+                        if chrom.startswith(spikein_prefix):
+                            spikein_chroms.append(chrom)
+
+                    if len(spikein_chroms) > 0:
+                        # Prevent chromosomes from the spike-in organism influencing normalisation
+                        command.extend(["--ignoreForNormalization", ' '.join(spikein_chroms)])
+                    else:
+                        raise ValueError(f"No spike-in chromosomes found with prefix {spikein_prefix}")
+
+            else:
+                raise ValueError(f"Unknown normalisation method {norm_method}")
 
         if effective_genome_size > 0:
-            command += f" --effectiveGenomeSize {effective_genome_size}"
+            command.extend(["--effectiveGenomeSize", str(effective_genome_size)])
 
         if filter_strand:
-            command += f" --filterRNAstrand {filter_strand}"
+            command.extend(["--filterRNAstrand", str(filter_strand)])
 
             if filter_strand == "reverse":
                 # Create negative signal for reverse stand
-                if scale_factor == 1:
-                    scale_factor = -1
+                if scale_factor > 0:
+                    scale_factor *= -1
 
         if scale_factor != 1:
-            command += f" --scaleFactor {scale_factor}"
+            command.extend(["--scaleFactor", str(scale_factor)])
 
         if self.verbose > 0:
             message = f"Creating {filter_strand}{' strand ' if filter_strand else ''}"
             message += f"bigWig with deepTools"
+
+            if scale_factor != 1:
+                message += f" with scale factor {scale_factor}"
 
             if sample_name is not None:
                 message += f" for {sample_name}"
@@ -659,8 +898,7 @@ class ZoneNorm(ChromAnalysisExtended):
             print(message)
 
         # Run bamCoverage
-        subprocess.run(command, shell = True, stdout = subprocess_verbose)
-
+        subprocess.run(command, stdout = subprocess_verbose)
 
     def bamToBigWig(self, bam_paths = [], bin_size = 1, norm_method = "", subprocess_cores = 6,
                     effective_genome_size = None, extend_reads = None, filter_strand = False, 
@@ -690,6 +928,13 @@ class ZoneNorm(ChromAnalysisExtended):
 
         elif norm_method not in self.bam_norm_methods:
             raise ValueError(f"{self.norm_method} is not supported for deepTools bamCoverage")
+
+        if self.norm_method in ["Scalar", "Spike-in"]:
+            # Set sample specific scaling factors to multiple signal by
+            set_scalars = True
+        else:
+            scale_factor = 1
+            set_scalars = False
 
         if norm_method != "No Normalisation":
             output_prefix = f"_{norm_method}"
@@ -743,9 +988,27 @@ class ZoneNorm(ChromAnalysisExtended):
         process_bigwig_files = {}
         create_n_bigwigs = 0
 
+        check_scaling_factors = False
+        scaling_factors = self.scaling_factors
+
+        if set_scalars:
+            if isinstance(scaling_factors, float):
+                # Use constant value
+                scale_factor = scaling_factors
+
+            elif isinstance(scaling_factors, dict):
+                # Use sample-specific scaling factors
+                check_scaling_factors = True
+
         for bam_file in bam_paths:
             # Use BAM file path to set bigWig file names
             sample_name = bam_file.split(os.sep)[-1].replace(".bam", "")
+
+            if check_scaling_factors:
+                # Check scaling factors dictionary
+                if sample_name not in scaling_factors:
+                    raise ValueError(f"Normalisation was set as scalar, but scaling factor "
+                                     f"for sample {sample_name} was not set.")
 
             if len(filter_strand_dict) > 0:
                 bigwig_files = []
@@ -792,6 +1055,10 @@ class ZoneNorm(ChromAnalysisExtended):
             for sample_name, bigwig_files in process_bigwig_files.items():
                 bam_file = process_bam_files[sample_name]
 
+                if set_scalars:
+                    # Get sample-specific scaling factor
+                    scale_factor = scaling_factors[sample_name]
+
                 for i, bigwig_file in enumerate(bigwig_files):
                     if len(filter_strand_dict) > 0:
                         # Get forward or reverse strand
@@ -806,6 +1073,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                                          extend_reads = extend_reads,
                                                          filter_strand = strand,
                                                          norm_method = norm_method,
+                                                         scale_factor = scale_factor,
                                                          effective_genome_size = effective_genome_size,
                                                          sample_name = sample_name,
                                                          subprocess_verbose = subprocess_verbose))
@@ -818,6 +1086,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                             extend_reads = extend_reads,
                                             filter_strand = strand,
                                             norm_method = norm_method,
+                                            scale_factor = scale_factor,
                                             effective_genome_size = effective_genome_size,
                                             sample_name = sample_name,
                                             subprocess_verbose = subprocess_verbose)
@@ -863,8 +1132,8 @@ class ZoneNorm(ChromAnalysisExtended):
             raise FileNotFoundError(f'Could not find chrom_sizes_file "{chrom_sizes_file}"')
 
         sample_name = wig_file.split(os.sep)[-1].replace(".wig", "")
-        command = f"wigToBigWig {wig_file} {chrom_sizes_file} {sample_name}.bw"
-        subprocess.run(command, shell = True, stdout = subprocess_verbose)
+        command = ["wigToBigWig", wig_file, chrom_sizes_file, f"{sample_name}.bw"]
+        subprocess.run(command, stdout = subprocess_verbose)
 
     def openDefaultSignal(self, bw_idx, chromosome, signal_type = ""):
         chrom_signal = np.array([])
@@ -911,10 +1180,26 @@ class ZoneNorm(ChromAnalysisExtended):
 
         return kernel
 
+    def getTotalSpikeInReads(self):
+        """
+        If a spike-in prefix was set, return the total spike-in reads across spike-in 
+        chromosomes per sample
+        """
+
+        if self.spikein_prefix is None:
+            raise ValueError("Cannot count total spike-in reads as spike-in prefix was not given")
+        if not self.spikein_reads:
+            raise ValueError("Spike-in reads have not been calculated")
+
+        total_spikein_reads = np.sum(np.array(list(self.spikein_reads.values())), axis = 0)
+
+        return total_spikein_reads
+
     def getTestDistributions(self):
         """
         Returns distributions set to test for separating signal from background.
         """
+
         return self.test_distributions
 
     @classmethod
@@ -980,7 +1265,20 @@ class ZoneNorm(ChromAnalysisExtended):
             elif self.verbose > 0:
                 print("Scaling factors not yet set")
 
-        elif self.verbose > 0:
+            self.scaling_factors = {}
+            return self.scaling_factors
+
+        elif self.norm_method == "Scalar":
+            if isinstance(self.scaling_factors, float):
+                return self.scaling_factors
+            elif isinstance(self.scaling_factors, dict):
+                return self.scaling_factors
+            
+            else:
+                self.scaling_factors = {}
+                return self.scaling_factors
+
+        if self.verbose > 0:
             if self.norm_method == "No normalisation":
                 print("No scaling factors as no normalisation method was set")
             else:
@@ -1416,11 +1714,12 @@ class ZoneNorm(ChromAnalysisExtended):
                     zone_signal[start_idx:end_idx] = smooth_signal[start_coord:end_coord]
                 else:
                     # Read signal from bigWig
-                    zone_signal[start_idx:end_idx] = self.signalReader(bw_idx = sample_id,
-                                                                       start_idx = start_coord,
-                                                                       end_idx = end_coord,
-                                                                       chromosome = chromosome,
-                                                                       verbose = 0)
+                    signal = self.signalReader(bw_idx = sample_id,
+                                               start_idx = start_coord,
+                                               end_idx = end_coord,
+                                               chromosome = chromosome,
+                                               verbose = 0)
+                    zone_signal[start_idx:(start_idx + len(signal))] = signal
                     
                 # Update for the next zone
                 start_idx = end_idx
@@ -1985,23 +2284,29 @@ class ZoneNorm(ChromAnalysisExtended):
 
         return incomplete_bw_idxs
 
-    def interleaveChroms(self, process_chrom_bws):
+    def interleaveChroms(self, chromosomes = []):
         """
-        Create a list of (chromosome, sample_id) pairs to optimise process running order. 
+        Create a list of chromosomes or (chromosome, sample_id) pairs to optimise process running order. 
         Chromosomes are interleaved by size, so that the remaining largest is followed by 
         the remaining smallest, which is then followed by the next remaining largest etc.
-        e.g. [("chr1", 1), ("chrY", 1"), ("chr1", 2), ("chrY", 2), ("chr2", 1), ("chr21", 1), 
-              ("chr2", 2), ("chr21", 2)].
+
+        e.g. ["chr1", "chrY", "chr2"] for list of chromosomes
+
+        or [("chr1", 1), ("chrY", 1"), ("chr1", 2), ("chrY", 2), ("chr2", 1), ("chr21", 1), 
+            ("chr2", 2), ("chr21", 2)] for tuple pairs
 
         params:
-            process_chrom_bws: List of pyBigWig bigWigs to process.
+            chromosomes:       List of chromosome or (chromosome, sample_id) tuples process.
 
         returns:
             interleaved_chroms: List of (chromosome, sample_id) pairs in order to process.
         """
 
-        # Get chromosomes from bigWigs to process and sort by size
-        sorted_chroms = sorted(process_chrom_bws,
+        if len(chromosomes) == 0:
+            chromosomes = self.chromosomes
+
+        # Sort chromosomes by size
+        sorted_chroms = sorted(chromosomes,
                                key = lambda x: self.chrom_sizes.get(x[0], float("inf")))
 
         # Interleave largest and smallest chromosomes to reduce memory usage
@@ -2093,9 +2398,6 @@ class ZoneNorm(ChromAnalysisExtended):
             for bw_idx in incomplete_bw_idxs:
                 process_chrom_bws.append((chrom, bw_idx))
 
-        if (self.n_cores > 1) and self.interleave_sizes:
-            process_chrom_bws = self.interleaveChroms(process_chrom_bws)
-
         if len(process_chrom_bws) > 0:
             # Replace any underscores or dots as these are excluded from file names
             file_sample_names = self.file_sample_names
@@ -2110,6 +2412,9 @@ class ZoneNorm(ChromAnalysisExtended):
                     blacklist_coords[chrom] = np.array([])
 
             if self.n_cores > 1:
+                if self.interleave_sizes:
+                    process_chrom_bws = self.interleaveChroms(process_chrom_bws)
+
                 with ProcessPoolExecutor(self.n_cores) as executor:
                     smooth_processes = []
                     for chrom, bw_idx in process_chrom_bws:
@@ -2391,9 +2696,6 @@ class ZoneNorm(ChromAnalysisExtended):
             for bw_idx in incomplete_bw_idxs:
                 process_chrom_bws.append((chrom, bw_idx))
 
-        if (self.n_cores > 1) & self.interleave_sizes:
-            process_chrom_bws = self.interleaveChroms(process_chrom_bws)
-
         if len(process_chrom_bws) > 0:
             # Update attributes if different parameters given
             if downsample_size is None:
@@ -2408,6 +2710,9 @@ class ZoneNorm(ChromAnalysisExtended):
                 self.setLogTransform(log_transform, verbose = self.verbose)
 
             if (self.n_cores > 1) and (len(self.sample_ids) > 1):
+                if self.interleave_sizes:
+                    process_chrom_bws = self.interleaveChroms(process_chrom_bws)
+
                 # Predict regions of signal per sample from the smoothed signal
                 with ProcessPoolExecutor(self.n_cores) as executor:
                     test_processes = []
@@ -2536,10 +2841,11 @@ class ZoneNorm(ChromAnalysisExtended):
         else:
             transformed_signal = non_zero_signal
 
-        if (downsample_size > 0) and (downsample_size < len(transformed_signal)):
-            downsample = True
-        else:
-            downsample = False
+        downsample = False
+
+        if downsample_size is not None:
+            if (downsample_size > 0) and (downsample_size < len(transformed_signal)):
+                downsample = True
 
         # Calculate statistics for the transformed signal
         if calculate_stats:
@@ -2751,9 +3057,10 @@ class ZoneNorm(ChromAnalysisExtended):
         if (self.verbose > 0):
             print(f"Fitting distributions to {chromosome} {sample_name} ({bw_idx + 1}/{n_samples})")
 
-        if downsample_size > 0:
-            # Update to get statistics for the downsampled statistics
-            transformed_stats = self.calculateAverages(signal_to_fit)
+        if downsample_size is not None:
+            if downsample_size > 0:
+                # Update to get statistics for the downsampled statistics
+                transformed_stats = self.calculateAverages(signal_to_fit)
 
         # Statistics for all fitted distributions
         distribution_stats = {}
@@ -3872,14 +4179,14 @@ class ZoneNorm(ChromAnalysisExtended):
                     raise ValueError(f"Statistics file does not exist for {custom_sample_names[bw_idx]} "
                                      f"{chrom}")
 
-        if self.interleave_sizes:
-            process_chrom_bws = self.interleaveChroms(process_chrom_bws)
-
         if len(process_chrom_bws) > 0:
             if self.verbose > 0:
                 print(f"Set to predict signal zones using {zone_distribution} distribution, "
                       f'{param_type.replace("_fit", "")} parameters and {round(self.zone_probability, 3)} '
                       f"zone probability")
+
+            if self.interleave_sizes:
+                process_chrom_bws = self.interleaveChroms(process_chrom_bws)
 
             if self.quality_filter:
                 chrom_fragments = {}
@@ -3958,7 +4265,12 @@ class ZoneNorm(ChromAnalysisExtended):
 
                         for chrom, bw_idx in process_chrom_bws:
                             # Open merged zone coordinates
-                            merged_zones = self.getMergedZones(chrom, get_padded = False)["unpadded"]
+                            merged_zones = self.getMergedZones(chrom, get_padded = False)
+
+                            if len(merged_zones) > 0:
+                                merged_zones = merged_zones["unpadded"]
+                            else:
+                                raise ValueError(f"Missing merged zones for {chrom}")
                             
                             stats_processes.append(executor.submit(self.calculateZoneStats,
                                                                    bw_idx = bw_idx,
@@ -4031,26 +4343,32 @@ class ZoneNorm(ChromAnalysisExtended):
                                                    merged_zones_file = padded_merged_file,
                                                    verbose = self.verbose)
 
-                        for chrom, bw_idx in process_chrom_bws:
-                            # Open merged zone coordinates
-                            merged_zones = self.getMergedZones(chrom, get_padded = False)["unpadded"]
+                    for chrom, bw_idx in process_chrom_bws:
+                        # Open merged zone coordinates
+                        merged_zones = self.getMergedZones(chrom, get_padded = False)
+
+                        if len(merged_zones) > 0:
+                            merged_zones = merged_zones["unpadded"]
+                        else:
+                            raise ValueError(f"Missing merged zones for {chrom}")
+
+                        self.calculateZoneStats(bw_idx = bw_idx,
+                                                chromosome = chrom,
+                                                use_padded = False,
+                                                use_merged = True,
+                                                zones = merged_zones,
+                                                exclude_zero = self.exclude_zero,
+                                                zone_remove_percent = self.zone_remove_percent)
+
+                        if pad_zones:
+                            merged_zones = self.getMergedZones(chrom, get_unpadded = False)["padded"]
                             self.calculateZoneStats(bw_idx = bw_idx,
                                                     chromosome = chrom,
-                                                    use_padded = False,
+                                                    use_padded = True,
                                                     use_merged = True,
                                                     zones = merged_zones,
                                                     exclude_zero = self.exclude_zero,
                                                     zone_remove_percent = self.zone_remove_percent)
-
-                            if pad_zones:
-                                merged_zones = self.getMergedZones(chrom, get_unpadded = False)["padded"]
-                                self.calculateZoneStats(bw_idx = bw_idx,
-                                                        chromosome = chrom,
-                                                        use_padded = True,
-                                                        use_merged = True,
-                                                        zones = merged_zones,
-                                                        exclude_zero = self.exclude_zero,
-                                                        zone_remove_percent = self.zone_remove_percent)
 
         elif self.verbose > 0:
             if create_merged:
@@ -4176,7 +4494,8 @@ class ZoneNorm(ChromAnalysisExtended):
             file_name:         File name and path to save normalised signal to.
         """
 
-        sample_name = np.array(self.getSampleNames(return_custom = True))[bw_idx]
+        full_sample_name = np.array(self.getSampleNames(return_custom = False))[bw_idx]
+        custom_sample_name = np.array(self.getSampleNames(return_custom = True))[bw_idx]
 
         # Open full signal prior to normalisation
         signal = self.signalReader(bw_idx = bw_idx,
@@ -4185,15 +4504,27 @@ class ZoneNorm(ChromAnalysisExtended):
                                    chromosome = chromosome,
                                    verbose = 0)
 
+        if self.norm_method == "Scalar":
+            if isinstance(self.scaling_factors, float):
+                scale_factor = self.scaling_factors
+            elif isinstance(self.scaling_factors, dict):
+                scale_factor = self.scaling_factors[full_sample_name]
+            else:
+                self.scaling_factors = {}
+                raise ValueError("scaling_factors must be set as either a number or "
+                                 "a dictionary mapping sample names to numbers")
+
         if self.verbose > 0:
-            if self.norm_method == "Power":
+            if self.norm_method in ["Scalar", "Spike-in"]:
+                norm_message = f"Multiplying signal by {scale_factor}"
+            elif self.norm_method == "Power":
                 norm_message = f"Raising signal to the power of {self.norm_power} for"
             elif self.norm_method == "Log":
                 norm_message = "Log transforming"
             else:
                 norm_message = f"{self.norm_method} normalising"
 
-            print(f"{norm_message} {chromosome} {sample_name} " 
+            print(f"{norm_message} {chromosome} {custom_sample_name} " 
                   f"({bw_idx + 1}/{len(self.sample_ids)})")
             
         if self.norm_method == "ZEN":
@@ -4202,10 +4533,14 @@ class ZoneNorm(ChromAnalysisExtended):
 
             sample_sd = sample_norm_stats["SD"]
             # Record scaling factor for the sample
-            self.scaling_factors[sample_name] = 1 / sample_sd
+            self.scaling_factors[full_sample_name] = 1 / sample_sd
 
             # Normalise the signal by variance
             signal = (signal / sample_sd).astype(np.float32)
+
+        elif self.norm_method == "Scalar":
+            # Multiple signal by a scaler
+            signal = (signal * scale_factor).astype(np.float32)
 
         elif self.norm_method == "Power":
             # Raise signal to a power
@@ -4217,14 +4552,16 @@ class ZoneNorm(ChromAnalysisExtended):
 
         if file_name:
             if self.verbose > 0:
-                if self.norm_method == "Power":
+                if self.norm_method == "Scalar":
+                    norm_message = f"signal multiplied by {scale_factor}"
+                elif self.norm_method == "Power":
                     norm_message = f"signal raised to the power of {self.norm_power}"
                 elif self.norm_method == "Log":
                     norm_message = "log transformed signal"
                 else:
                     norm_message = f"{self.norm_method} normalised signal"
 
-                print(f"Saving {norm_message} for {sample_name} {chromosome} " 
+                print(f"Saving {norm_message} for {custom_sample_name} {chromosome} " 
                       f"({bw_idx + 1}/{len(self.sample_ids)})")
                 
             # Save to compressed numpy file
@@ -4260,6 +4597,12 @@ class ZoneNorm(ChromAnalysisExtended):
                 # Warn user
                 raise ValueError(f"Invalid bigWig normalisation method {invalid_norm}."
                                  f"\nDefaulting to no normalisation.")
+
+        if self.norm_method == "Scalar":
+            if len(self.bam_paths) > 0:
+                if self.verbose > 0:
+                    print("bigWigs created from BAMs were already scalar normalised")
+                return None
 
         if norm_stats_type is None:
             norm_stats_type = self.norm_stats_type
@@ -4299,7 +4642,7 @@ class ZoneNorm(ChromAnalysisExtended):
             else:
                 process_parallel = False
 
-            if self.norm_method in ["Power", "Log"]:
+            if self.norm_method in ["Scalar", "Power", "Log"]:
                 use_signal_stats = False
                 sample_norm_stats = None
 
@@ -4857,6 +5200,128 @@ class ZoneNorm(ChromAnalysisExtended):
         if return_df:
             return combined_dist_stats_df
 
+    def mergeChromSignal(self, chromosome, sample_ids):
+        """
+        For each sample, sum signal across a chromosome]
+
+        params:
+            chromosome: Name of chromosome to combine signal across.
+            sample_ids: List of sample IDs for samples to combine.
+        """
+
+        if self.verbose > 0:
+            print(f"Merging {chromosome} signal across {len(sample_ids)} samples")
+
+        # Create array to hold addition of chromosome signal across samples
+        chrom_signal = np.zeros(self.chrom_sizes[chromosome], dtype = np.float32)
+
+        for sample_id in sample_ids:
+            # Add whole chromosome signal from the sample's bigWig
+            chrom_signal += self.signalReader(bw_idx = sample_id,
+                                              start_idx = 0,
+                                              end_idx = -1,
+                                              chromosome = chromosome,
+                                              pad_end = True)
+
+        return chrom_signal
+
+    def saveMergedBigWig(self, samples, file_name):
+        """
+        Add signal across bigWigs and save to a new bigWig.
+
+        params:
+            samples:   List of samples to combine.
+            file_name: Name of output bigWig file.
+        """
+
+        # Get sample IDs from sample names
+        sample_ids = [self.sampleToIndex(s) for s in samples]
+
+        if (self.n_cores > 1) & self.interleave_sizes:
+            chromosomes = self.interleaveChroms()
+        else:
+            chromosomes = self.chromosomes
+
+        chrom_order_map = {chrom: idx for idx, chrom in enumerate(self.chromosomes)}
+
+        # Record combined signal per chromosome
+        signals = [None] * len(chromosomes)
+
+        if self.n_cores > 1:
+            with ProcessPoolExecutor(self.n_cores) as executor:
+                signal_processes = {}
+
+                for chrom in chromosomes:
+                    process = executor.submit(self.mergeChromSignal,
+                                              chromosome = chrom,
+                                              sample_ids = sample_ids)
+                    signal_processes[process] = chrom
+                            
+                for process in as_completed(signal_processes):
+                    chrom_signal = process.result()
+                    chrom = signal_processes[process]
+                    chrom_idx = chrom_order_map[chrom]
+                    signals[chrom_idx] = chrom_signal
+
+        else:
+            for chrom in chromosomes:
+                chrom_signal = self.mergeChromSignal(chromosome = chrom,
+                                                     sample_ids = sample_ids)
+                    
+                signals.append(chrom_signal)
+
+        self.saveBigWig(file_name = file_name,
+                        directory = self.output_directories["merged_bigwig"],
+                        signals = signals)
+
+    def createmergedBigWigs(self, samples, file_name = ""):
+        """
+        Combine two or more bigWigs into a single bigWig through addition of signal.
+
+        params:
+            samples: List of samples to combine.
+        """
+
+        if isinstance(samples, (list, np.ndarray)):
+            full_sample_names = self.getSampleNames(return_custom = False)
+            custom_sample_names = self.getSampleNames(return_custom = False)
+            samples = []
+            missing_samples = []
+
+            for sample in samples:
+                if (sample in full_sample_names) or (sample in custom_sample_names):
+                    samples.append(sample)
+                else:
+                    missing_samples.append(sample)
+
+            n_missing = len(missing_samples)
+
+            if n_missing > 0:
+                raise ValueError(f"{n_missing} sample{'s' if n_missing != 0 else ''} "
+                                 f"could not be found: {', '.join(missing_samples)}")
+            
+        else:
+            raise ValueError("samples must be set as a list of samples")
+            
+        n_samples = len(samples)
+
+        if n_samples < 2:
+            error_message = "Merging bigWigs requires two or more samples, "
+
+            if n_samples == 0:
+                error_message += " but none were given"
+            else:
+                error_message += " but only one was given"
+
+            raise ValueError(error_message)
+        
+        if not file_name:
+            file_name = "merged"
+        if not (file_name.endswith(".bw") or file_name.endswith(".bigWig")):
+            file_name += ".bw"
+
+        self.saveMergedBigWig(samples = samples, 
+                              file_name = file_name)
 
     def saveBinnedBigWig(self, bw_idx, file_name, directory, bin_size):
         """
@@ -5006,21 +5471,23 @@ class ZoneNorm(ChromAnalysisExtended):
             processes = []
                 
             with ProcessPoolExecutor(self.n_cores) as executor:
-                for bw_idx, name in zip(self.sample_ids, sample_names):
+                for bw_idx, name in zip(sample_ids, sample_names):
                     processes.append(executor.submit(self.saveBigWig,
                                                      bw_idx = bw_idx,
                                                      file_name = f"{name}_smooth.bw",
                                                      directory = smooth_bigwigs_dir,
-                                                     signal_type = "smooth"))
+                                                     signal_type = "smooth",
+                                                     replace_existing = False))
                 if self.checkParallelErrors(processes):
                     raise RuntimeError("createSmoothBigWigs failed to complete. To debug, see trace above.")
 
         else:
-            for bw_idx, name in zip(self.sample_ids, sample_names):
+            for bw_idx, name in zip(sample_ids, sample_names):
                 self.saveBigWig(bw_idx = bw_idx,
                                 file_name = f"{name}_smooth.bw",
                                 directory = smooth_bigwigs_dir,
-                                signal_type = "smooth")
+                                signal_type = "smooth",
+                                replace_existing = False)
 
     def createNormalisedBigWigs(self, sample_ids = []):
         """
@@ -5053,7 +5520,8 @@ class ZoneNorm(ChromAnalysisExtended):
                                                          bw_idx = bw_idx,
                                                          file_name = f"{name}_{self.norm_method}.bw",
                                                          directory = normalised_bigwigs_dir,
-                                                         signal_type = "norm"))
+                                                         signal_type = "norm",
+                                                         replace_existing = False))
                     if self.checkParallelErrors(processes):
                         raise RuntimeError("createNormalisedBigWigs failed to complete. To debug, see trace above.")
 
@@ -5062,7 +5530,8 @@ class ZoneNorm(ChromAnalysisExtended):
                     self.saveBigWig(bw_idx = bw_idx,
                                     file_name = f"{name}_{self.norm_method}.bw",
                                     directory = normalised_bigwigs_dir,
-                                    signal_type = "norm")
+                                    signal_type = "norm",
+                                    replace_existing = False)
         else:
             print(f"Cannot create new normalised bigWigs for {len(sample_ids)} "
                   f"samples as no normalisation was applied")

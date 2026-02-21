@@ -7,9 +7,13 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import seaborn as sns
 from scipy import stats
+import statsmodels.formula.api as smf
 from matplotlib.colors import LinearSegmentedColormap
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from .chrom_analysis import ChromAnalysisCore
+#from .chrom_analysis import ChromAnalysisCore
+
+os.chdir("/ceph/project/Wellcome_Discovery/towilson/Projects/ZEN-norm/PyPI/src/ZEN_norm/")
+from chrom_analysis import ChromAnalysisCore
 
 ##########################################
 # Main class for normalisation comparision
@@ -493,11 +497,27 @@ class CompareNorm(ChromAnalysisCore):
                 non_normalised = True
             else:
                 non_normalised = False
+            if norm.lower().startswith("lib"):
+                full_library = True
+            else:
+                full_library = False
 
             for sample in sample_names:
                 if non_normalised:
-                    # Set path for non-normalised (raw) bigWigs
-                    bigwig_files.append(f"{bigwig_directory}/No_Normalisation/{sample}{file_extension}")
+                    # Set path for non-normalised bigWigs
+                    if os.path.exists(f"{bigwig_directory}/Raw/"):
+                        # Use either raw or no normalisation sub-folder
+                        bigwig_files.append(f"{bigwig_directory}/Raw/{sample}{file_extension}")
+                    else:
+                        bigwig_files.append(f"{bigwig_directory}/No_Normalisation/{sample}{file_extension}")
+
+                elif full_library:
+                    if os.path.exists(f"{bigwig_directory}/{norm}/"):
+                        bigwig_files.append(f"{bigwig_directory}/{norm}/{sample}_{norm}{file_extension}")
+                    else:
+                        # Interpret lib as abbreviation for full library
+                        bigwig_files.append(f"{bigwig_directory}/Full_Library/{sample}_Full_Library{file_extension}")
+
                 else:
                     # Set path for normalised bigWigs
                     bigwig_files.append(f"{bigwig_directory}/{norm}/{sample}_{norm}{file_extension}")
@@ -1010,9 +1030,9 @@ class CompareNorm(ChromAnalysisCore):
         # Create pairs of sample IDs to plot
         pos_id_pairs = self.createPairs(pos_sample_ids)
         neg_id_pairs = self.createPairs(neg_sample_ids)
-        sample_id_pairs = np.concatenate((pos_id_pairs, neg_id_pairs)).astype(np.uint16)
+        sample_pair_ids = np.concatenate((pos_id_pairs, neg_id_pairs)).astype(np.uint16)
 
-        n_pairs = len(sample_id_pairs)
+        n_pairs = len(sample_pair_ids)
         n_cols = min(n_pairs, int(n_cols))
         n_rows = int(np.ceil(n_pairs / n_cols))
 
@@ -1021,7 +1041,7 @@ class CompareNorm(ChromAnalysisCore):
                                  constrained_layout = True)
         axes = np.atleast_1d(axes).flatten()
 
-        for i, pair in zip(range(n_pairs), sample_id_pairs):
+        for i, pair in zip(range(n_pairs), sample_pair_ids):
             ax = axes[i]
 
             signal_1 = combined_counts[pair[0]] + 1
@@ -1056,14 +1076,14 @@ class CompareNorm(ChromAnalysisCore):
 
         plt.show()
 
-    def wassersteinDistance(self, sample_ids, bigwig_files, chromosome, start_idx = 0, end_idx = -1,
+    def wassersteinDistance(self, sample_pair_ids, bigwig_files, chromosome, start_idx = 0, end_idx = -1,
                             norm_method = "", exclude_all_zeros = False, min_values = {}, 
                             max_values = {}):
         """
         Calculate min-max scaled Wasserstein distance between two sample signals for a region.
 
         params:
-            sample_ids:        List of sample IDs to calculate distance for.
+            sample_pair_ids:   List of pairs of sample ID tuples to calculate distance for.
             bigwig_files:      List of bigWig file paths with order matching sample IDs.
             chromosome:        Name of chromosome to read signal for.
             start_idx:         Start base-pair position (zero indexed).
@@ -1075,13 +1095,10 @@ class CompareNorm(ChromAnalysisCore):
             max_values:        Optionally pre-set the maximum value per sample pair to min-max scale by.
         """
 
-        # Create pairs of sample IDs
-        sample_id_pairs = self.createPairs(sample_ids)
-
         signals = {}
         distances = {}
 
-        for sample_id in sample_ids:
+        for sample_id in np.unique(sample_pair_ids):
             # Read absolute value of signal within region for each sample
             sample_name = self.sample_names[sample_id]
             bw_file = bigwig_files[sample_name]
@@ -1092,7 +1109,7 @@ class CompareNorm(ChromAnalysisCore):
                                                                 sample_name = sample_name,
                                                                 pad_end = True))
 
-        for pair in sample_id_pairs:
+        for pair in sample_pair_ids:
             sample_id_1 = int(pair[0])
             sample_id_2 = int(pair[1])
 
@@ -1131,9 +1148,9 @@ class CompareNorm(ChromAnalysisCore):
 
         if norm_method != "":
             # Return the distance and an identifier
-            return distances, norm_method
+            return distances, sample_pair_ids, norm_method
         else:
-            return distances
+            return distances, sample_pair_ids
 
     def addPlotStars(self, ax, x1, x2, y, p_value, bar_height = 0.001):
         """ 
@@ -1166,9 +1183,10 @@ class CompareNorm(ChromAnalysisCore):
 
     def plotWasserstein(self, plot_samples = [], norm_methods = [], chromosomes = [], 
                         reference_norm = "", pair_merge_coords = True, use_chrom_maxs = False, 
-                        exclude_all_zeros = False, log_scale = False, cmap = True, 
-                        plot_type = "violin", title = "", plot_width = 6, plot_height = 4, 
-                        pdf_name = ""):
+                        exclude_all_zeros = False, star_test = "mann whitney u", use_fdr = True, 
+                        log_scale = False, cmap = True, plot_type = "violin", title = "", 
+                        plot_width = 6, plot_height = 4, pdf_name = "Wasserstein_Distance_Plot", 
+                        save_dists = True, save_tests = True, replace_existing = False):
         """
         Create violin or box plot of Wasserstein distance between samples over specified regions or
         coordinates.
@@ -1189,6 +1207,11 @@ class CompareNorm(ChromAnalysisCore):
                                  the maximum signal value for each coordinate pair. 
             exclude_all_zeros:   Whether to ignore any pair of samples in which one or both signals were
                                  all zero during wasserstein distance calculation.
+            star_test:           If reference_norm was given, set this as the statistical test to compare 
+                                 distributions. Significant p-values are plotted as stars above the 
+                                 distributions. Options include: "linear mixed model", "wilcoxon", 
+                                 "mann whitney u", "ks stat", "t-test".
+            use_fdr:             Whether to use raw or FDR adjusted p-values for star_test.
             log_scale:           Whether to log transform the y-axis.
             cmap:                Can be set as a colour map for the violins / boxes, kept as True to use 
                                  the default colour map or False to use solid colours.
@@ -1197,9 +1220,22 @@ class CompareNorm(ChromAnalysisCore):
             plot_width:          Length of the plot.
             plot_height:         Height of the plot.
             pdf_name:            To save plot to PDF, set this as a file name.
+            save_dists:          Whether to save Wasserstein distances across normalisation methods to CSV.
+            save_tests:          Whether to save p-values testing significance between normalisation method 
+                                 distributions to CSV.
+            replace_existing:    Whether to overwrite previously created files.
         """
 
-        wasserstein_dists = {}
+        dists_csv_file = os.path.join(self.output_directories["output_stats"], "wasserstein_distances.csv")
+        tests_csv_file = os.path.join(self.output_directories["output_stats"], "wasserstein_statistical_tests.csv")
+        lm_csv_file = os.path.join(self.output_directories["output_stats"], "linear_model_results.csv")
+
+        if pdf_name:
+            if not pdf_name.endswith(".pdf"):
+                pdf_name = pdf_name + ".pdf"
+
+            # Create directory to store plots
+            os.makedirs(self.output_directories["plots"], exist_ok = True)
 
         if len(plot_samples) > 0:
             plot_samples = np.array(plot_samples)
@@ -1234,12 +1270,84 @@ class CompareNorm(ChromAnalysisCore):
         else:
             norm_methods = self.norm_methods
 
+        calculate_dists = True
+        calculate_tests = True
+        tests_exists = False
+
+        # Check whether to recreate files
+        if not replace_existing:
+            if pdf_name:
+                if not os.path.exists(pdf_name):
+                    replace_existing = True
+
+            if save_dists:
+                if os.path.exists(dists_csv_file):
+                    try:
+                        dist_df = pd.read_csv(dists_csv_file)
+
+                        if len(dist_df) > 0:
+                            # Check all normalisation methods are present
+                            all_norm = np.array_equal(np.sort(np.unique(dist_df["norm_method"])), 
+                                                      np.sort(norm_methods))
+                            
+                            if all_norm:
+                                calculate_dists = False
+                            else:
+                                replace_existing = True
+                        else:
+                            replace_existing = True
+                    except:
+                        replace_existing = True
+
+            if save_tests:
+                if os.path.exists(tests_csv_file):
+                    try:
+                        tests_df = pd.read_csv(tests_csv_file)
+                        tests_exists = True
+                    except:
+                        replace_existing = True
+
+                if tests_exists and os.path.exists(lm_csv_file):
+                    try:
+                        lm_df = pd.read_csv(lm_csv_file)
+                        replace_existing = False
+                        calculate_tests = False
+                    except:
+                        replace_existing = True
+
+        if not replace_existing:
+            if self.verbose > 0:
+                print("Wasserstein distance plot and test statistics already exist")
+
         if reference_norm != "":
             if reference_norm not in norm_methods:
                 raise ValueError(f'Unknown reference normalisation method "{reference_norm}"')
 
             # Add significant stars at top of plot to compare normalisation methods with the reference
             add_stars = True
+
+            star_test = star_test.lower()
+            use_fdr = bool(use_fdr)
+
+            if star_test.startswith("l"):
+                # Linear mixed model using reference normalisation method as intercept
+                star_test = "linear mixed model"
+            elif star_test.startswith("w"):
+                # Wilcoxon signed-rank test
+                star_test = "wilcoxon"
+            elif star_test.startswith("m"):
+                # Mann Whitney U test
+                star_test = "mann whitney u"
+            elif star_test.startswith("k"):
+                # Kolmogorov-Smirnov test
+                star_test = "ks stat"
+            elif star_test.startswith("t"):
+                # Paired t-test
+                star_test = "t-test"
+            else:
+                raise ValueError(f'Unsupported statistical test {star_test}.\n'
+                                 f'Set star_test as either "mann whitney u", "ks stat" or "t-test".')
+
         else:
             add_stars = False
 
@@ -1276,34 +1384,8 @@ class CompareNorm(ChromAnalysisCore):
         # Create each combination of samples with other samples of the same sign
         pos_id_pairs = self.createPairs(pos_sample_ids)
         neg_id_pairs = self.createPairs(neg_sample_ids)
-        sample_id_pairs = np.concatenate((pos_id_pairs, neg_id_pairs)).astype(np.uint16)
-
-        pair_chrom_maxs = {}
-
-        if use_chrom_maxs:
-            for chrom in chromosomes:
-                pair_chrom_maxs[str(chrom)] = {}
-
-                for pair in sample_id_pairs:
-                    sample_id_1 = int(pair[0])
-                    sample_id_2 = int(pair[1])
-
-                    pair_chrom_maxs[chrom][(sample_id_1, sample_id_2)] = max(self.chrom_maxs[sample_id_1][chrom], 
-                                                                             self.chrom_maxs[sample_id_2][chrom])
-
-        if pair_merge_coords:
-            if self.coords_df is None:
-                pair_merge_coords = False
-
-                if self.verbose > 1:
-                    print(f"Using same coordinates per sample pair as only fixed coordinates were given")
-
-            elif self.verbose > 1:
-                print("Using coordinates merged per sample pair")
-
-                if len(self.sample_names) == 2:
-                    # Disable recalculation of merged coordinates
-                    pair_merge_coords = False
+        sample_pair_ids = np.concatenate((pos_id_pairs, neg_id_pairs)).astype(np.uint16)
+        sample_pair_id_tuples = [tuple([int(pair[0]), int(pair[1])]) for pair in sample_pair_ids]
 
         if title == "":
             title = "Min-Max Scaled Signal Distance"
@@ -1333,44 +1415,130 @@ class CompareNorm(ChromAnalysisCore):
             raise ValueError(f'Invalid plot_type "{plot_type}". Options include: '
                              f'"violin" and "box"')
 
-        if pdf_name:
-            if not pdf_name.endswith(".pdf"):
-                pdf_name = pdf_name + ".pdf"
-
-            # Create directory to store plots
-            os.makedirs(self.output_directories["plots"], exist_ok = True)
-
-        if pair_merge_coords:
+        if calculate_dists:
             if self.verbose > 0:
-                print("Merging pair-specific peak coordinates")
+                n_chroms = len(chromosomes)
+                print(f"Calculating Wasserstein distances over {n_chroms} "
+                      f"chromosome{'s' if n_chroms != 1 else ''}")
 
-            coords_dfs = {}
+            pair_chrom_maxs = {}
 
-            for pair in sample_id_pairs:
-                sample_id_1 = int(pair[0])
-                sample_id_2 = int(pair[1])
+            if use_chrom_maxs:
+                for chrom in chromosomes:
+                    pair_chrom_maxs[str(chrom)] = {}
 
-                # Combine region coordinates for the pair
-                regions_paths = self.regions_df[(self.regions_df["sample"] == self.sample_names[sample_id_1]) | 
-                                                (self.regions_df["sample"] == self.sample_names[sample_id_2])]["regions"].to_numpy()
-                
-                coords_dfs[(sample_id_1, sample_id_2)] = self.mergeRegions(regions_paths = regions_paths,
-                                                                           min_consensus = self.min_consensus,
-                                                                           border_pad = self.border_pad)
+                    for pair in sample_pair_ids:
+                        sample_id_1 = int(pair[0])
+                        sample_id_2 = int(pair[1])
 
-        if self.verbose > 0:
-            n_chroms = len(chromosomes)
-            print(f"Calculating Wasserstein distances over {n_chroms} "
-                  f"chromosome{'s' if n_chroms != 1 else ''}")
+                        pair_chrom_maxs[chrom][(sample_id_1, sample_id_2)] = max(self.chrom_maxs[sample_id_1][chrom], 
+                                                                                 self.chrom_maxs[sample_id_2][chrom])
 
-        max_values = {}
+            if pair_merge_coords:
+                if self.coords_df is None:
+                    pair_merge_coords = False
 
-        if self.n_cores > 1:
-            with ProcessPoolExecutor(self.n_cores) as executor:
-                processes = []
+                    if self.verbose > 1:
+                        print(f"Using same coordinates per sample pair as only fixed coordinates were given")
 
+                elif self.verbose > 1:
+                    print("Using coordinates merged per sample pair")
+
+                    if len(self.sample_names) == 2:
+                        # Disable recalculation of merged coordinates
+                        pair_merge_coords = False
+
+            if pair_merge_coords:
+                if self.verbose > 0:
+                    print("Merging pair-specific peak coordinates")
+
+                coords_dfs = {}
+
+                for pair in sample_pair_ids:
+                    sample_id_1 = int(pair[0])
+                    sample_id_2 = int(pair[1])
+
+                    # Combine region coordinates for the pair
+                    regions_paths = self.regions_df[(self.regions_df["sample"] == self.sample_names[sample_id_1]) | 
+                                                    (self.regions_df["sample"] == self.sample_names[sample_id_2])]["regions"].to_numpy()
+                    
+                    coords_dfs[(sample_id_1, sample_id_2)] = self.mergeRegions(regions_paths = regions_paths,
+                                                                               min_consensus = self.min_consensus,
+                                                                               border_pad = self.border_pad)
+
+            wasserstein_dists = {}
+            max_values = {}
+
+            if self.n_cores > 1:
+                with ProcessPoolExecutor(self.n_cores) as executor:
+                    processes = []
+
+                    for norm_method in norm_methods:
+                        wasserstein_dists[norm_method] = {pair: [] for pair in sample_pair_id_tuples}
+                        norm_bigwig_files = {}
+
+                        norm_df = self.bigwig_df[self.bigwig_df["norm"] == norm_method]
+                        norm_bigwig_files = dict(zip(norm_df["sample"], norm_df["bigwig"]))
+
+                        for chrom in chromosomes:
+                            if use_chrom_maxs:
+                                max_values = pair_chrom_maxs[chrom]
+
+                            if pair_merge_coords:
+                                for pair in sample_pair_ids:
+                                    # Get chromosome coordinates combined across the two samples
+                                    sample_id_1 = pair[0]
+                                    sample_id_2 = pair[1]
+                                    pair_df = coords_dfs[(sample_id_1, sample_id_2)]
+                                    chrom_rows = pair_df[pair_df["chrom"] == chrom]
+                                    chrom_coords = chrom_rows[["start", "end"]].values.tolist()
+
+                                    for region_coords in chrom_coords:
+                                        start = int(region_coords[0])
+                                        end = int(region_coords[1])
+
+                                        # Calculate distance for pair-specific coordinates
+                                        processes.append(executor.submit(self.wassersteinDistance,
+                                                                         sample_pair_ids = [tuple(pair)],
+                                                                         bigwig_files = norm_bigwig_files,
+                                                                         chromosome = chrom,
+                                                                         start_idx = start,
+                                                                         end_idx = end,
+                                                                         norm_method = norm_method,
+                                                                         max_values = max_values,
+                                                                         exclude_all_zeros = exclude_all_zeros))
+
+                            else:
+                                # Get chromosome coordinates to use for every sample pair
+                                chrom_rows = self.coords_df[self.coords_df["chrom"] == chrom]
+                                chrom_coords = chrom_rows[["start", "end"]].values.tolist()
+
+                                for region_coords in chrom_coords:
+                                    start = int(region_coords[0])
+                                    end = int(region_coords[1])
+
+                                    # Calculate distances for all sample pairs using the same coordinates
+                                    processes.append(executor.submit(self.wassersteinDistance,
+                                                                     sample_pair_ids = sample_pair_id_tuples,
+                                                                     bigwig_files = norm_bigwig_files,
+                                                                     chromosome = chrom,
+                                                                     start_idx = start,
+                                                                     end_idx = end,
+                                                                     norm_method = norm_method, 
+                                                                     max_values = max_values,
+                                                                     exclude_all_zeros = exclude_all_zeros))
+
+                    for process in as_completed(processes):
+                        dist, pairs, norm_method = process.result()
+
+                        for pair in pairs:
+                            wasserstein_dists[norm_method][pair].extend(list(dist.values()))
+
+                    if self.checkParallelErrors(processes):
+                        raise RuntimeError("plotWasserstein failed to complete. To debug, see trace above.")
+            else:
                 for norm_method in norm_methods:
-                    wasserstein_dists[norm_method] = []
+                    wasserstein_dists[norm_method] = {pair: [] for pair in sample_pair_id_tuples}
                     norm_bigwig_files = {}
 
                     norm_df = self.bigwig_df[self.bigwig_df["norm"] == norm_method]
@@ -1381,8 +1549,7 @@ class CompareNorm(ChromAnalysisCore):
                             max_values = pair_chrom_maxs[chrom]
 
                         if pair_merge_coords:
-                            for pair in sample_id_pairs:
-                                # Get chromosome coordinates combined across the two samples
+                            for pair in sample_pair_ids:
                                 sample_id_1 = pair[0]
                                 sample_id_2 = pair[1]
                                 pair_df = coords_dfs[(sample_id_1, sample_id_2)]
@@ -1394,127 +1561,135 @@ class CompareNorm(ChromAnalysisCore):
                                     end = int(region_coords[1])
 
                                     # Calculate distance for pair-specific coordinates
-                                    processes.append(executor.submit(self.wassersteinDistance,
-                                                                     sample_ids = pair,
-                                                                     bigwig_files = norm_bigwig_files,
-                                                                     chromosome = chrom,
-                                                                     start_idx = start,
-                                                                     end_idx = end,
-                                                                     norm_method = norm_method,
-                                                                     max_values = max_values,
-                                                                     exclude_all_zeros = exclude_all_zeros))
-
-                        else:
-                            # Get chromosome coordinates to use for every sample pair
-                            chrom_rows = self.coords_df[self.coords_df["chrom"] == chrom]
-                            chrom_coords = chrom_rows[["start", "end"]].values.tolist()
-
-                            for region_coords in chrom_coords:
-                                start = int(region_coords[0])
-                                end = int(region_coords[1])
-
-                                # Calculate distances for all sample pairs using the same coordinates
-                                processes.append(executor.submit(self.wassersteinDistance,
-                                                                 sample_ids = sample_ids,
-                                                                 bigwig_files = norm_bigwig_files,
-                                                                 chromosome = chrom,
-                                                                 start_idx = start,
-                                                                 end_idx = end,
-                                                                 norm_method = norm_method, 
-                                                                 max_values = max_values,
-                                                                 exclude_all_zeros = exclude_all_zeros))
-
-                for process in as_completed(processes):
-                    dist, norm_method = process.result()
-                    wasserstein_dists[norm_method].extend(list(dist.values()))
-
-                if self.checkParallelErrors(processes):
-                    raise RuntimeError("plotWasserstein failed to complete. To debug, see trace above.")
-        else:
-            for norm_method in norm_methods:
-                wasserstein_dists[norm_method] = []
-                norm_bigwig_files = {}
-
-                norm_df = self.bigwig_df[self.bigwig_df["norm"] == norm_method]
-                norm_bigwig_files = dict(zip(norm_df["sample"], norm_df["bigwig"]))
-
-                for chrom in chromosomes:
-                    if use_chrom_maxs:
-                        max_values = pair_chrom_maxs[chrom]
-
-                    if pair_merge_coords:
-                        for pair in sample_id_pairs:
-                            sample_id_1 = pair[0]
-                            sample_id_2 = pair[1]
-                            pair_df = coords_dfs[(sample_id_1, sample_id_2)]
-                            chrom_rows = pair_df[pair_df["chrom"] == chrom]
-                            chrom_coords = chrom_rows[["start", "end"]].values.tolist()
-
-                            for region_coords in chrom_coords:
-                                start = int(region_coords[0])
-                                end = int(region_coords[1])
-
-                                # Calculate distance for pair-specific coordinates
-                                dist, _ = self.wassersteinDistance(sample_ids = pair,
-                                                                   bigwig_files = norm_bigwig_files,
-                                                                   chromosome = chrom,
-                                                                   start_idx = start,
-                                                                   end_idx = end,
-                                                                   norm_method = norm_method,
-                                                                   max_values = max_values,
-                                                                   exclude_all_zeros = exclude_all_zeros)
-                                wasserstein_dists[norm_method].extend(list(dist.values()))
+                                    dist, pairs, _ = self.wassersteinDistance(sample_pair_ids = [tuple(pair)],
+                                                                              bigwig_files = norm_bigwig_files,
+                                                                              chromosome = chrom,
+                                                                              start_idx = start,
+                                                                              end_idx = end,
+                                                                              norm_method = norm_method,
+                                                                              max_values = max_values,
+                                                                              exclude_all_zeros = exclude_all_zeros)
+                                    wasserstein_dists[norm_method][pairs].extend(list(dist.values()))
 
 
-                    chrom_rows = self.coords_df[self.coords_df["chrom"] == chrom]
-                    chrom_coords = chrom_rows[["start", "end"]].values.tolist()
+                        chrom_rows = self.coords_df[self.coords_df["chrom"] == chrom]
+                        chrom_coords = chrom_rows[["start", "end"]].values.tolist()
 
-                    for region_coords in chrom_coords:
-                        start = int(region_coords[0])
-                        end = int(region_coords[1])
+                        for region_coords in chrom_coords:
+                            start = int(region_coords[0])
+                            end = int(region_coords[1])
 
-                        # Calculate distances for all sample pairs using the same coordinates
-                        dist, _ = self.wassersteinDistance(sample_ids = sample_ids,
-                                                           bigwig_files = norm_bigwig_files,
-                                                           chromosome = chrom,
-                                                           start_idx = start,
-                                                           end_idx = end,
-                                                           norm_method = norm_method,
-                                                           max_values = max_values,
-                                                           exclude_all_zeros = exclude_all_zeros)
-                        wasserstein_dists[norm_method].extend(list(dist.values()))
+                            # Calculate distances for all sample pairs using the same coordinates
+                            dist, pairs, _ = self.wassersteinDistance(sample_pair_ids = sample_pair_id_tuples,
+                                                                      bigwig_files = norm_bigwig_files,
+                                                                      chromosome = chrom,
+                                                                      start_idx = start,
+                                                                      end_idx = end,
+                                                                      norm_method = norm_method,
+                                                                      max_values = max_values,
+                                                                      exclude_all_zeros = exclude_all_zeros)
+                            wasserstein_dists[norm_method][pairs].extend(list(dist.values()))
 
         if self.verbose > 0:
             print(f"Plotting {plot_type} plot")
 
-        dist_df = pd.concat([pd.DataFrame({"norm": norm, "wasserstein_distance": dists}) for 
-                             norm, dists in wasserstein_dists.items()])
+        # Map pairs of sample IDs to names
+        custom_sample_names = self.getSampleNames()
+        sample_id_to_name = dict(zip(sample_pair_id_tuples,
+                                    [f"{custom_sample_names[pair[0]]}_vs_{custom_sample_names[pair[1]]}" for 
+                                     pair in sample_pair_id_tuples]))
 
-        if len(dist_df) == 0:
-            if self.verbose > 0:
-                print("Cannot create plot as no Wasserstein distances found")
+        control_norm = list(norm_methods[norm_methods != reference_norm])
+
+        if calculate_dists:
+            norm_values = []
+            dist_values = []
+            pair_values = []
+
+            for norm, pairs in wasserstein_dists.items():
+                for pair, dists in pairs.items():
+                    dists = np.array(dists)
+                    n_dists = len(dists)
+
+                    if n_dists == 0:
+                        continue
+
+                    norm_values.append(np.repeat(norm, n_dists))
+                    dist_values.append(dists)
+                    pair_values.extend([sample_id_to_name[pair]] * n_dists)
+
+            # Create dataframe of Wasserstein distances per sample pair across normalisation methods
+            dist_df = pd.DataFrame({"norm_method": np.concatenate(norm_values),
+                                    "wasserstein_distance": np.concatenate(dist_values),
+                                    "pair": pair_values})
+
+            if len(dist_df) == 0:
+                if self.verbose > 0:
+                    print("Cannot create plot as no Wasserstein distances found")
+
+                return None
+
+            # Create output directory if it does not exist
+            os.makedirs(self.output_directories["output_stats"], exist_ok = True)
+
+            if save_dists:
+                dist_df.to_csv(dists_csv_file, header = True, index = False)
+
+        if calculate_tests:
+            # Set reference normalisation method to be the contrast
+            dist_df["norm_method"] = dist_df["norm_method"].astype("category")
+            dist_df["norm_method"] = dist_df["norm_method"].cat.reorder_categories([reference_norm] + control_norm, 
+                                                                                   ordered = False)
+
+            # Fit linear mixed model
+            model = smf.mixedlm("wasserstein_distance ~ norm_method", dist_df, groups = dist_df["pair"], 
+                                re_formula = "~1")
+            lm_result = model.fit()
+
+            # Adjust p-value for false discovery rate
+            lm_fdr = np.full(len(norm_methods) + 1, np.nan)
+            lm_fdr[1:-1] = stats.false_discovery_control(lm_result.pvalues[1:-1],
+                                                         method = "by")
+
+            # Format results as a DataFrame
+            lm_df = pd.DataFrame({"contrast": ["Intercept"] + control_norm + ["Group Var"],
+                                  "coefficient": lm_result.params,
+                                  "standard_error": lm_result.bse,
+                                  "z": lm_result.tvalues,
+                                  "p_value": lm_result.pvalues,
+                                  "FDR": lm_fdr})
+            lm_df.reset_index(drop = True)
+
+            lm_df.to_csv(lm_csv_file, 
+                        header = True, index = False)
+
+            # Reorder so that normalisation methods are displayed in the original order given
+            dist_df["norm_method"] = dist_df["norm_method"].cat.reorder_categories(norm_methods, 
+                                                                                ordered = False)
 
         if add_stars:
             # Map between normalisation methods to plot and indexes
             norm_id_map = {norm: i for i, norm in enumerate(norm_methods)}
-            # Set values to adjust sigificant star placement
+            # Set values to adjust significant star placement
             star_base_height = max(dist_df["wasserstein_distance"])
             star_increment = star_base_height * 0.1
             star_base_height += len(norm_methods) * star_increment
 
         norm_pairs = self.createPairs(norm_methods)
+        n_norm_pairs = len(norm_pairs)
 
         if add_colourmap:
             # Calculate mean wasserstein distance per normalisation method
-            average_dists = [np.mean(wasserstein_dists[norm_method]) for norm_method in norm_methods]
+            average_dists = dist_df.groupby("norm_method")["wasserstein_distance"].mean()
+            average_dists = average_dists.reindex(norm_methods).values
             # Scale colours between [0,1] based on distance
             cmap_norm = mcolors.Normalize(vmin = min(average_dists), vmax = max(average_dists))
-            
+
         # Create the plot
         fig, ax = plt.subplots(figsize = (plot_width, plot_height), constrained_layout = True)
 
         if plot_type == "violin":
-            sns.violinplot(data = dist_df, x = "norm", y = "wasserstein_distance", ax = ax, 
+            sns.violinplot(data = dist_df, x = "norm_method", y = "wasserstein_distance", ax = ax, 
                            log_scale = log_scale)
         else:
             if add_colourmap:
@@ -1524,40 +1699,96 @@ class CompareNorm(ChromAnalysisCore):
             else:
                 colour_palette = "colorblind"
 
-            sns.boxplot(data = dist_df, x = "norm", y = "wasserstein_distance", ax = ax, 
+            sns.boxplot(data = dist_df, x = "norm_method", y = "wasserstein_distance", ax = ax, 
                         log_scale = log_scale, palette = colour_palette)
 
-        t_test_p_values = []
+        test_names = ["wilcoxon", "ks", "mann", "t-test"]
+        n_tests = len(test_names)
 
-        for norm_pair in norm_pairs:
-            norm_1 = norm_pair[0]
-            norm_2 = norm_pair[1]
+        if calculate_tests:
+            test_p_values = []
 
-            # Perform t-test between Wasserstein distances of two normalisation methods
-            t_test = stats.ttest_ind(wasserstein_dists[norm_1], wasserstein_dists[norm_2])
-            p_value = float(t_test.pvalue)
-            t_test_p_values.append(p_value)
+            for norm_pair in norm_pairs:
+                norm_1 = norm_pair[0]
+                norm_2 = norm_pair[1]
 
-            if add_stars:
-                if (norm_1 == reference_norm) or (norm_2 == reference_norm):
-                    # Add significance stars between the reference normalisation and another normalisation
-                    self.addPlotStars(ax = ax, x1 = norm_id_map[norm_1], x2 = norm_id_map[norm_2], 
-                                      y = star_base_height - (star_increment * norm_id_map[norm_1]), 
-                                      p_value = p_value)
-                    
-        # Format t-test p-values as a DataFrame
-        t_test_csv_file = "wasserstein_t_test_p_values.csv"
-        t_test_df = pd.DataFrame({"norm_method_1": norm_pairs[:,0],
-                                  "norm_method_2": norm_pairs[:,1],
-                                  "t_test_p_value": t_test_p_values})
-        t_test_df.to_csv(os.path.join(self.output_directories["output_stats"], t_test_csv_file), 
-                         header = True, index = False)
+                # Get Wasserstein distances
+                norm_1_dists = dist_df.loc[dist_df["norm_method"] == norm_1]["wasserstein_distance"].values
+                norm_2_dists = dist_df.loc[dist_df["norm_method"] == norm_2]["wasserstein_distance"].values
+
+                # Perform significance tests between Wasserstein distances of two normalisation methods
+                wilcoxon = stats.wilcoxon(norm_1_dists, norm_2_dists)
+                wilcoxon_p_value = float(wilcoxon.pvalue)
+                test_p_values.append(wilcoxon_p_value)
+
+                ks_stat = stats.kstest(norm_1_dists, norm_2_dists)
+                ks_p_value = float(ks_stat.pvalue)
+                test_p_values.append(ks_p_value)
+
+                mann_whitney = stats.mannwhitneyu(norm_1_dists, norm_2_dists)
+                mann_p_value = float(mann_whitney.pvalue)
+                test_p_values.append(mann_p_value)
+
+                t_test = stats.ttest_rel(norm_1_dists, norm_2_dists)
+                t_test_p_value = float(t_test.pvalue)
+                test_p_values.append(t_test_p_value)
+
+            # Format p-values as a DataFrame
+            tests_df = pd.DataFrame({"norm_method_1": np.repeat(norm_pairs[:,0], n_tests),
+                                     "norm_method_2": np.repeat(norm_pairs[:,1], n_tests),
+                                     "test": test_names * n_norm_pairs,
+                                     "p_value": test_p_values,
+                                     "FDR": np.nan})
+
+            for test in test_names:
+                # Calculate adjusted p-values
+                test_idxs = tests_df["test"] == test
+                p_values = tests_df.loc[test_idxs, "p_value"].values
+                fdr_values = stats.false_discovery_control(p_values)
+                tests_df.loc[test_idxs, "FDR"] = fdr_values
+
+            if save_tests:
+                tests_df.to_csv(tests_csv_file, header = True, index = False)
+
+        if add_stars:
+            for norm in control_norm:
+                if star_test == "linear mixed model":
+                    # Use significance from the linear mixed model
+                    norm_df = lm_df.loc[(lm_df["contrast"] == norm)]
+                    p_value = norm_df["p_value"].values[0]
+
+                else:
+                    norm_df = tests_df[((tests_df["norm_method_1"] == reference_norm) & 
+                                        (tests_df["norm_method_2"] == norm)) |
+                                       ((tests_df["norm_method_1"] == norm) & 
+                                        (tests_df["norm_method_2"] == reference_norm))]
+
+                if use_fdr:
+                    p_value = norm_df["FDR"].values[0]
+                else:
+                    p_value = norm_df["p_value"].values[0]
+
+                # Get coordinates for reference normalisation and comparison
+                norm_reference_x = norm_id_map[reference_norm]
+                norm_compare_x = norm_id_map[norm]
+
+                # Set coordinates based on which normalisation method is plotted first
+                if norm_reference_x < norm_compare_x:
+                    norm_x1 = norm_reference_x
+                    norm_x2 = norm_compare_x
+                else:
+                    norm_x1 = norm_compare_x
+                    norm_x2 = norm_reference_x
+
+                # Add significance stars between the reference normalisation and another normalisation
+                self.addPlotStars(ax = ax, x1 = norm_x1, x2 = norm_x2, 
+                                  y = star_base_height - (star_increment * norm_x1), 
+                                  p_value = p_value)
 
         if add_colourmap:
             if plot_type == "violin":
                 for patch_idx, violin in enumerate(ax.collections):
                     # Set colour of violin
-                    norm_method = norm_methods[patch_idx]
                     mean_dist = average_dists[patch_idx]
                     violin_colour = cmap(cmap_norm(mean_dist))
                     violin.set_facecolor(violin_colour)
@@ -1571,7 +1802,7 @@ class CompareNorm(ChromAnalysisCore):
         plt.ylabel("Wasserstein Distance (w)")
         plt.title(title, fontweight = "bold")
 
-        if pdf_name:
+        if replace_existing and pdf_name:
             plt.savefig(os.path.join(self.output_directories["plots"], pdf_name),
                         format = "pdf", bbox_inches = "tight")
 

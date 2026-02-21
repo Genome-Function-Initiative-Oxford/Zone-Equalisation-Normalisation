@@ -86,6 +86,33 @@ class ChromAnalysisCore:
         return os.path.join(os.getcwd(), self.analysis_name)
 
     @staticmethod
+    def downloadFTP(ftp_paths, directory = None):
+        """
+        Download BAM or bigWig files by FTP into a directory
+
+        params:
+            directory: Directory to store files into
+        """
+
+        file_extensions = (".bam", ".bw", ".bigWig")
+
+        if directory is None:
+            # Use current directory
+            directory = os.getcwd()
+        else:
+            # Create directory to download bigWigs into
+            os.makedirs(directory, exist_ok = True)
+
+        for ftp_path in ftp_paths:
+            # Get name of file to save contents to
+            file = os.path.join(directory, ftp_path.split(os.sep)[-1].replace("%2", "-").replace("%5F", "_"))
+
+            # Check file has a valid extension
+            if file.endswith(file_extensions):
+                # Download the file
+                subprocess.run(["wget", "--progress=bar:force:noscroll", "-O", file, ftp_path], check = True)
+
+    @staticmethod
     def checkValidDirectory(directory):
         """
         Raises error if directory is missing or empty.
@@ -784,6 +811,33 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             # File derived names
             return list(self.sample_names.keys())
 
+    @staticmethod
+    def findBamChroms(bam_file):
+        """
+        Get a list of chromosomes from the BAM header.
+
+        params:
+            bam_file: BAM file to process.
+        """
+
+        # Get chromosomes from header
+        command = ["samtools", "view", "-H", bam_file]
+        result = subprocess.run(command, capture_output = True, text = True, check = True)
+
+        chromosomes = []
+
+        for line in result.stdout.splitlines():
+            # Find sequence entry
+            if line.startswith("@SQ"):
+                fields = line.split("\t")
+                for field in fields:
+                    # Locate sequence name
+                    if field.startswith("SN:"):
+                        # Record chromosome name
+                        chromosomes.append(field[3:])
+
+        return chromosomes
+
     def sampleToIndex(self, sample_name):
         """
         Convert a sample name to a sample index
@@ -1119,7 +1173,7 @@ class ChromAnalysisExtended(ChromAnalysisCore):
         raise ValueError("openDefaultSignal not specified")
 
     def saveBigWig(self, file_name, directory, bw_idx = None, custom_sample_name = "", signal_type = "", signals = [], 
-                   chrom_sizes = {}):
+                   chrom_sizes = {}, replace_existing = True):
         """
         Save a signal to a bigWig file.
 
@@ -1152,6 +1206,9 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             file_name = file_name + ".bw"
         file_name = os.path.join(directory, file_name)
 
+        # Create output directory if it doesn't exist
+        os.makedirs(directory, exist_ok = True)
+
         if (bw_idx is None):
             if n_signals == 0:
                 raise ValueError("bw_idx must be specified to know which sample to save signal for")
@@ -1174,6 +1231,39 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             sample_name = self.getSampleNames(return_custom = True)[bw_idx]
         else:
             sample_name = custom_sample_name
+
+        if not replace_existing:
+            if os.path.isfile(file_name):
+                file_size = os.path.getsize(file_name)
+
+                if file_size < 1000:
+                    if self.verbose > 1:
+                        print(f"bigWig {file_name} was less than 1000 bytes so will be recreated")
+
+                    # File is small, so likely missing signal
+                    replace_existing = True
+
+                else:
+                    try:
+                        # Attempt to open the bigWig if it already exists
+                        bigwig = pyBigWig.open(file_name)
+
+                    except:
+                        if self.verbose > 1:
+                            print(f"bigWig {file_name} could not be opened so will be recreated")
+
+                        # If bigWig failed to open, then recreate it
+                        replace_existing = True
+
+            else:
+                # File did not exist, so create it
+                replace_existing = True
+
+        if not replace_existing:
+            if self.verbose > 1:
+                print(f'bigWig "{file_name}" already exists')
+                
+            return None
 
         if self.verbose > 0:
             print(f'Saving signal for {sample_name} to bigWig "{file_name}"')
@@ -1300,10 +1390,10 @@ class ChromAnalysisExtended(ChromAnalysisCore):
         """
 
         bigbed_file = f"{os.path.splitext(bed_file)[0]}.bb"
-        command = f"bedToBigBed {bed_file} {chrom_sizes_file} {bigbed_file}"
+        command = ["bedToBigBed", bed_file, chrom_sizes_file, bigbed_file]
 
         # Run bedToBigBed
-        subprocess.run(command, shell = True, stdout = subprocess_verbose)
+        subprocess.run(command, stdout = subprocess_verbose)
 
     def createZoneBED(self, zone_type = "padded", create_bigbed = False, chrom_sizes_file = None, 
                       name_postfix = "", desc_postfix = "", file_postfix = ""):
