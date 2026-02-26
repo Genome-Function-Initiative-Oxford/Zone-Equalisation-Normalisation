@@ -3,6 +3,7 @@
 
 	* Minor bug fixes
 	* Major bux fix for running predictSignalZones with one core
+	* Major bux fix for saving signal statistics per chromosome
 	* Gzip compression of temporary CSVs and support for XZ compression
 	* New function for creating binned bigWigs from input bigWigs
 	* Added support for rescaling bigWigs by custom sample-specific scaling factors
