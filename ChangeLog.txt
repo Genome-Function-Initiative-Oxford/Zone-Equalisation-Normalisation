@@ -1,13 +1,15 @@
-08/02/2026 TomMakesThings
+26/02/2026 TomMakesThings
 	Version 0.0.2 [Unreleased]
 
 	* Minor bug fixes
-	* Major bux fix for running predictSignalZones with one core
+	* Major bux fixes for running predictSignalZones with one core and saving signal statistics per chromosome
 	* Gzip compression of temporary CSVs and support for XZ compression
 	* New function for creating binned bigWigs from input bigWigs
+	* Split ZoneNorm parameter norm_stats_type into zen_from_zones, zen_padded_zones and zen_sample_zones
 	* Added support for rescaling bigWigs by custom sample-specific scaling factors
+	* Updated labels for fitting distribution histograms
 	* Added more significance test options for Wasserstein distribution plots
-	* Independent t-test removed from Wasserstein distribution plots and default set as TBC
+	* Independent t-test removed from Wasserstein distribution plots and default set as linear mixed model
 
 08/11/2025 TomMakesThings
 	Version 0.0.1

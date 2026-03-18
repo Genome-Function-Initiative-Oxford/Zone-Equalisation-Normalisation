@@ -30,12 +30,15 @@ class ChromAnalysisCore:
             verbose:             Set as an integer greater than 0 to display progress messages.
         """
 
+        # Initialise output directories
+        self.output_directories = {}
+
         # Set base parameters
         self.setNCores(n_cores)
         self.setAnalysisName(analysis_name)
         self.setVerbose(verbose)
 
-        # Directories to save intermediate files and results
+        # Set directories to save intermediate files and results
         temp_dir = os.path.join(self.analysis_name, "Temp")
         results_dir = os.path.join(self.analysis_name, "Results")
 
@@ -72,6 +75,13 @@ class ChromAnalysisCore:
             self.analysis_name = "Analysis"
         else:
             self.analysis_name = str(analysis_name)
+
+        if self.output_directories:
+            # Rename directories to save to
+            old_dirs = self.output_directories.values()
+            new_dirs = [os.path.join(self.analysis_name, 
+                                     os.path.join(*i.split(os.sep)[1:])) for i in old_dirs]
+            self.output_directories = dict(zip(self.output_directories.keys(), new_dirs))
 
     def setVerbose(self, verbose):
         try:
@@ -1172,8 +1182,8 @@ class ChromAnalysisExtended(ChromAnalysisCore):
     def openDefaultSignal(self, bw_idx, chromosome, signal_type = ""):
         raise ValueError("openDefaultSignal not specified")
 
-    def saveBigWig(self, file_name, directory, bw_idx = None, custom_sample_name = "", signal_type = "", signals = [], 
-                   chrom_sizes = {}, replace_existing = True):
+    def saveBigWig(self, file_name, directory, bw_idx = None, custom_sample_name = "", signal_type = "", 
+                   signals = [], chrom_sizes = {}, resize_signal = True, replace_existing = True):
         """
         Save a signal to a bigWig file.
 
@@ -1192,6 +1202,10 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                                  np.array([8.2, 3.5, 3.5, ... , 2.7, 4.6, 6.6]])] # chrX
             chrom_sizes:        A dictionary of chromosomes to save signal for, along with their length.
                                 e.g. for hg19 {"chr1": 249250621, "chr6": 171115067, "chrX": 155270560}.
+            resize_signal:      If True, then chromosome signal will be padded or cropped if there is a 
+                                mismatch in length between it and the expected chromosome size. 
+                                If False, an error is raised if a mismatch occurs.
+            replace_existing:   Whether to overwrite previously created files.
         """
 
         n_signals = len(signals)
@@ -1304,20 +1318,32 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                     raise ValueError(f"Could not find signal for {chrom} in provided signal list")
 
             chrom_signal_size = len(chrom_signal)
+            expected_size = chrom_sizes[chrom]
             
             if chrom_signal_size == 0:
                 if self.verbose > 0:
                     print(f"Signal is missing for {sample_name} at {chrom}")
                 continue
 
-            elif chrom_signal_size != chrom_sizes[chrom]:
-                raise ValueError(f"{chrom} has length {chrom_sizes[chrom]}, but signal has length "
-                                 f"{chrom_signal_size}")
+            elif chrom_signal_size != expected_size:
+                if not resize_signal:
+                    raise ValueError(f"{chrom} has length {expected_size}, but signal has length "
+                                    f"{chrom_signal_size}")
+                
+                elif chrom_signal_size > expected_size:
+                    # Crop signal to fit expected size
+                    chrom_signal = chrom_signal[:expected_size]
+                else:
+                    # Pad signal to expected size
+                    padded_signal = np.zeros(expected_size, dtype = np.float32)
+                    padded_signal[:chrom_signal_size] = chrom_signal
+                    chrom_signal = padded_signal
+                    del padded_signal
 
             # Remove adjacent duplicated values for saving bigWig intervals
             # e.g. for signal [0.1, 0.1, 0.1, 5.7, 5.7, 5.7, 3.4, 3.4, 3.4, 3.4, 3.4, 3.4, 5.7, ...],
             # extract the values [0.1, 5.7, 3.4, 5.7, ...] and coordinates [0, 3, 6, 12, ...]
-            non_consecutive_idxs = np.ones(chrom_signal_size, dtype = bool)
+            non_consecutive_idxs = np.ones(expected_size, dtype = bool)
             non_consecutive_idxs[1:] = chrom_signal[1:] != chrom_signal[:-1]
             interval_values = chrom_signal[non_consecutive_idxs]
             interval_coords = np.where(non_consecutive_idxs)[0]
@@ -1378,164 +1404,6 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                                        "size": self.chrom_sizes.values()})
         chrom_sizes_df.to_csv(chrom_sizes_file, header = False, index = False, sep = "\t")
         self.chrom_sizes_file = chrom_sizes_file
-
-    @staticmethod
-    def saveBigBed(bed_file, chrom_sizes_file, subprocess_verbose = None):
-        """
-        Convert a BED file to a bigBed file.
-
-        params:
-            chrom_sizes_file:   Path to file of tab separated chromosomes and sizes.
-            subprocess_verbose: Verbose of stdout when running subprocess.
-        """
-
-        bigbed_file = f"{os.path.splitext(bed_file)[0]}.bb"
-        command = ["bedToBigBed", bed_file, chrom_sizes_file, bigbed_file]
-
-        # Run bedToBigBed
-        subprocess.run(command, stdout = subprocess_verbose)
-
-    def createZoneBED(self, zone_type = "padded", create_bigbed = False, chrom_sizes_file = None, 
-                      name_postfix = "", desc_postfix = "", file_postfix = ""):
-        """
-        Save zones to BED file for visualisation in a genome browser.
-
-        params:
-            zone_type:        Set as either 'padded' or 'unpadded'.
-            create_bigbed:    Set as True to also save a bigBed file.
-            chrom_sizes_file: Path to file of tab separated chromosomes and sizes for creating bigBed.
-            name_postfix:     Postfix text to add to end of name in BED header.
-            desc_postfix:     Postfix text to add to end of description in BED header.
-            file_postfix:     Postfix text to add to end of BED file name.
-        """
-
-        chrom_col, start_col, end_col = self.region_coords_cols
-        sample_names = np.array(self.getSampleNames(return_custom = True))
-
-        zone_type = zone_type.lower()
-        if zone_type not in ["padded", "unpadded"]:
-            raise ValueError(f"Unsupported zone_type {zone_type}.")
-
-        if create_bigbed:
-            if chrom_sizes_file is None:
-                chrom_sizes_file = os.path.join(self.output_directories["bed"],
-                                                f'{self.analysis_name.replace(" ", "_")}.chrom.sizes')
-
-                if not os.path.exists(chrom_sizes_file):
-                    self.createChromSizes(chrom_sizes_file)
-
-            else:
-                if os.path.exists(chrom_sizes_file):
-                    raise FileNotFoundError(f'chrom_sizes_file "{chrom_sizes_file}" does not exist')
-
-            if self.verbose > 0:
-                subprocess_verbose = None
-            else:
-                # Disable any printing
-                subprocess_verbose = subprocess.DEVNULL
-
-
-        if file_postfix:
-            file_postfix = file_postfix.replace(" ", "_")
-
-        if self.verbose > 0:
-            if create_bigbed:
-                print(f"Saving zones to BED and bigBed files")
-            else:
-                print(f"Saving zones to BED files")
-
-        results_bed_dir = os.path.join(self.output_directories["bed"], "Zones")
-
-        # Create new directory to store BED files
-        os.makedirs(results_bed_dir, exist_ok = True)
-
-        # Create empty dictionary to record each zone coordinates per sample
-        all_sample_zones = {}
-        all_sample_chroms = {}
-
-        for bw_idx in self.sample_ids:
-            all_sample_zones[bw_idx] = np.empty((0,2), dtype = np.uint32)
-            all_sample_chroms[bw_idx] = {"chroms": [], "n_repeats": []}
-
-        for chrom in self.chromosomes:
-            chrom_signal_zones = self.getSampleZones(chrom)[zone_type]
-            # chrom_merged_zones = self.getMergedZones(chrom)
-
-            if len(chrom_signal_zones) > 0:
-                for bw_idx in self.sample_ids:
-                    # Extract the zones for a specific sample for the chromosome
-                    sample_name = sample_names[bw_idx]
-                    sample_zones = chrom_signal_zones[sample_name]
-                    n_sample_zones = len(sample_zones)
-
-                    # Add zones to the dictionary
-                    all_sample_zones[bw_idx] = np.concatenate((all_sample_zones[bw_idx], sample_zones))
-                    # Record the chromosome name and the number of zones
-                    all_sample_chroms[bw_idx]["chroms"].append(chrom)
-                    all_sample_chroms[bw_idx]["n_repeats"].append(n_sample_zones)
-
-            elif self.verbose > 0:
-                print(f"Warning: No zones found for {chrom}")
-
-        if all(zones.shape[0] == 0 for zones in all_sample_zones.values()):
-            raise ValueError("No zones found for any chromosome")
-
-        for bed_idx in self.sample_ids:
-            # Only create a BED file if values are present
-            write_bed = False
-            # Use single sample's name
-            sample_name = sample_names[bed_idx]
-            # Get zone coordinates for the sample
-            all_coords = all_sample_zones[bed_idx]
-
-            if all_coords.shape[0] > 0:
-                write_bed = True
-                # Get values to create the chromosome column
-                bed_chroms = all_sample_chroms[bed_idx]["chroms"]
-                n_chrom_repeats = all_sample_chroms[bed_idx]["n_repeats"]
-
-            if write_bed:
-                # Set the file name to save to
-                bed_file = f"{zone_type}_zones_{sample_name}"
-                if file_postfix:
-                    bed_file += f"_{file_postfix}.bed"
-                else:
-                    bed_file += ".bed"
-                bed_file_path = os.path.join(results_bed_dir, bed_file)
-
-                # Set the header
-                track_name = sample_name
-
-                if name_postfix:
-                    track_name += f" {name_postfix}"
-
-                description = f"{zone_type.title()} zones for {sample_name}"
-
-                if desc_postfix:
-                    description += f" {name_postfix}"
-
-                # Format the coordinates as a DataFrame
-                result_row_names = [f"{sample_name}_{zone_type}_zones_{i}" for 
-                                    i in range(1, all_coords.shape[0] + 1)]
-                contents_df = pd.DataFrame({chrom_col: np.repeat(bed_chroms, n_chrom_repeats),
-                                            start_col: all_coords[:,0],
-                                            end_col: all_coords[:,1],
-                                            "name": result_row_names})
-
-                # Write results to BED file
-                self.saveBED(file_name = bed_file_path, 
-                             contents_df = contents_df,
-                             track_name = track_name,
-                             description = description,
-                             use_score = False)
-
-                if create_bigbed:
-                    self.saveBigBed(bed_file = bed_file_path,
-                                    chrom_sizes_file = chrom_sizes_file,
-                                    subprocess_verbose = subprocess_verbose)
-                    
-            elif self.verbose > 0:
-                print(f"Skipping creating BED file for {sample_name} as no {zone_type} zones were found")
 
     def findRegionsInRange(self, regions, start_coord, end_coord, cap_regions = False):
         """

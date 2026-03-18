@@ -8,9 +8,9 @@ import re
 import gc
 import gzip
 import lzma
+import time
 import matplotlib.pyplot as plt
 import subprocess
-import importlib.util
 import sympy as sp
 from scipy.special import expi
 from scipy import stats
@@ -28,7 +28,7 @@ from chrom_analysis import ChromAnalysisExtended
 class ZoneNorm(ChromAnalysisExtended):
     # deepTools bamCoverage normalisation and spike-in
     deeptools_norm_methods = ["RPKM", "CPM", "BPM", "RPGC"]
-    bam_norm_methods = deeptools_norm_methods + ["Scalar", "Spike-in"]
+    bam_norm_methods = deeptools_norm_methods + ["Scalar", "RRPM"]
     # Inbuilt normalisation methods and other transformations
     bigwig_norm_methods = ["ZEN", "Scalar", "Power", "Log"]
 
@@ -37,13 +37,6 @@ class ZoneNorm(ChromAnalysisExtended):
     supported_norm_methods.extend(bam_norm_methods)
     supported_norm_methods.extend(bigwig_norm_methods)
     supported_norm_methods = np.unique(supported_norm_methods)
-
-    # Allow normalisation against these options
-    supported_norm_stats_types = ["signal",
-                                  "signal_padded_merged_zones",
-                                  "signal_unpadded_merged_zones",
-                                  "signal_padded_sample_zones",
-                                  "signal_unpadded_sample_zones"]
 
     # Supported options for test distribution parameters
     param_types = ["scipy_fit", "mean_fit", "median_fit"]
@@ -67,17 +60,17 @@ class ZoneNorm(ChromAnalysisExtended):
 
     __slots__ = ("chrom_sizes_file", "interleave_sizes", "norm_method", "genome_size", "extend_reads", 
                  "filter_strand", "exclude_zero", "spikein_prefix", "spikein_reads", "zone_remove_percent", 
-                 "norm_stats_type", 
-                 "norm_power", "scaling_factors", "deletion_size", "downsample_size", "downsample_seed", 
-                 "kernel", "test_distributions", "log_transform", "zone_distribution", "zone_param_type", 
-                 "best_zone_distribution", "zone_probability", "bin_size", "extend_n_bins", 
-                 "merge_depth", "min_region_bps", "quality_filter", "min_different_bps")
+                 "zen_from_zones", "zen_padded_zones", "zen_sample_zones", "norm_power", "scaling_factors", 
+                 "scalar_name", "deletion_size", "downsample_size", "downsample_seed", "kernel", 
+                 "test_distributions", "log_transform", "zone_distribution", "zone_param_type", 
+                 "best_zone_distribution", "zone_probability", "bin_size", "extend_n_bins", "merge_depth", 
+                 "min_region_bps", "quality_filter", "min_different_bps")
     def __init__(self, bam_paths = [], bigwig_paths = [], chromosomes = [], chrom_sizes_file = None, 
                  interleave_sizes = True, sample_names = [], blacklist = "", norm_method = "ZEN", 
                  genome_size = None, extend_reads = False, filter_strand = False, spikein_prefix = "",
-                 exclude_zero = True, 
-                 zone_remove_percent = 10, norm_stats_type = "signal_padded_sample_zones",
-                 scaling_factors = {}, norm_power = None, deletion_size = 500, downsample_size = 300,
+                 exclude_zero = True, zone_remove_percent = 10, zen_from_zones = True, 
+                 zen_padded_zones = True, zen_sample_zones = True, scaling_factors = {}, 
+                 scalar_name = "Scalar", norm_power = None, deletion_size = 500, downsample_size = 300,
                  downsample_seed = 0, kernel = [], test_distributions = ["laplace"], log_transform = True, 
                  zone_distribution = "laplace", zone_param_type = "median_fit", 
                  zone_probability = 0.995, bin_size = 1000, extend_n_bins = 1, merge_depth = 5, 
@@ -106,7 +99,7 @@ class ZoneNorm(ChromAnalysisExtended):
             blacklist:           File path to blacklist file with chromosome coordinates to exclude.
             norm_method:         Signal Normalisation method to apply, i.e. "ZEN", "Scalar", "Power",
                                  "Log", "No normalisation" (bigWig/BAM) or "RPKM", "CPM", "BPM", "RPGC", 
-                                 "Spike-in" (BAM).
+                                 "RRPM" (BAM).
             genome_size:         Required if using "RPGC" BAM normalisation. Can be set as either an 
                                  integer, or "hg19", "grch37", "hg38", "grch38", "t2t", "chm13cat_v2",
                                  "mm9", "grcm37", "mm10", "grcm38", "mm39", "grcm39", "dm3", "dm6",
@@ -124,7 +117,9 @@ class ZoneNorm(ChromAnalysisExtended):
                                  prefix to separate the chromosomes by organism. For example, with a 
                                  combined human ("chr1", "chr2", ...) and yeast genome 
                                  ("sacCer3_chrI", "sacCer3_chrII", ...,), yeast chromosomes are 
-                                 identifiable by their prefix "sacCer3".
+                                 identifiable by their prefix "sacCer3". This ensures spike-in 
+                                 reads are used for RRPM normalisation, or excluded from RPKM, CPM, BPM, 
+                                 RPGC.
             exclude_zero:        Whether to ignore zeros when calculating statistics within signal 
                                  zones.
             zone_remove_percent: Set as a value greater than zero to ignore an upper and lower 
@@ -134,16 +129,18 @@ class ZoneNorm(ChromAnalysisExtended):
                                  removed when calculating mean and standard deviation. This prevents 
                                  extreme values, such as those caused by technical artifacts in 
                                  ATAC/ChIP-seq, from biasing the normalisation.
-            norm_stats_type:     Type of statistics to use for ZEN normalisation. By default, this is 
-                                 "signal_padded_sample_zones", which will calculate averages and 
-                                 deviations from signal within sample-specific padded zones. Other 
-                                 options include: "signal_unpadded_sample_zones", which instead uses 
-                                 unpadded zones, "signal_padded_merged_zones" or 
-                                 "signal_unpadded_merged_zones", which use zone coordinates merged 
-                                 across all samples, or "signal", which considers all signal for 
-                                 statistics calculations.
+            zen_from_zones:      If running ZEN normalisation, set this as True to calculate statistics 
+                                 for rescaling signal from signal within zones, or False to use all
+                                 signal.
+            zen_padded_zones:    If running ZEN normalisation from zones, set as True to use statistics
+                                 from padded zones, or False to use statistics from unpadded zones.
+            zen_sample_zones:    If running ZEN normalisation from zones, set as True to use statistics
+                                 from sample-specific zones, or False to use statistics from zones 
+                                 merged across all samples.
             scaling_factors:     If norm_method is set as "Scalar", set this as a number to multiple all 
                                  samples signal by, or a dictionary mapping sample names to numbers.
+            scalar_name:         Can be used to set a custom name for scalar normalisation, e.g. "TMM" 
+                                 if TMM scaling factors are given.
             norm_power:          If norm_method is set as "Power", set this as a number to raise 
                                  signal to the power of.
             deletion_size:       Threshold number of consecutive zeros in the signal for a region to be 
@@ -172,11 +169,10 @@ class ZoneNorm(ChromAnalysisExtended):
                                  first rounded to [5,000, 7,000], then extended either side by 
                                  (2 * 1,000) as [3,000, 9,000].
             merge_depth:         Minimum distance between two zones for them to be combined into one.
-            min_region_bps:      Minimum size of a region initially predicted to have signal, i.e. 
-                                 the number of base pairs that must consecutively exceed the zone 
-                                 threshold. The zone is likely to be larger than this if rounding 
-                                 region coordinates to the nearest bins and adding one or more bins 
-                                 worth of padding.
+            min_region_bps:      Minimum size of an unpadded zone, i.e. the lowest number of base pairs 
+                                 that must consecutively exceed the zone threshold. Padded zones are 
+                                 likely to be larger than this if rounding coordinates to the nearest 
+                                 bins and adding one or more bins worth of padding.
             quality_filter:      Set as True to filter out regions of signal within zones with 
                                  insufficient signal.
             min_different_bps:   If using the quality filter, set the minimum number of different 
@@ -226,10 +222,10 @@ class ZoneNorm(ChromAnalysisExtended):
         self.setExtendReads(extend_reads)
         self.setFilterStrand(filter_strand)
         self.setSpikeInPrefix(spikein_prefix)
-        self.setNormMethod(norm_method, norm_power, scaling_factors)
+        self.setNormMethod(norm_method, norm_power, scaling_factors, scalar_name, zen_from_zones, 
+                           zen_padded_zones, zen_sample_zones)
         self.setExcludeZero(exclude_zero)
         self.setZoneRemovePercent(zone_remove_percent)
-        self.setNormStatsType(norm_stats_type)
         self.setDeletionSize(deletion_size)
         self.setKernel(kernel)
 
@@ -248,8 +244,7 @@ class ZoneNorm(ChromAnalysisExtended):
         self.setBinSize(bin_size)
         self.setExtendNBins(extend_n_bins)
         self.setMergeDepth(merge_depth)
-        self.setMinDifferentBPs(min_different_bps)
-        self.setMinRegionBPs(min_region_bps)
+        self.setMinRegionBPs(min_region_bps, min_different_bps)
         self.setQualityFilter(quality_filter)
 
         # Check whether any BAM files were given that need converting to bigWig
@@ -257,7 +252,6 @@ class ZoneNorm(ChromAnalysisExtended):
             self.bamToBigWig(extend_reads = self.extend_reads, filter_strand = self.filter_strand)
             
         self.setChromAttributes(chromosomes)
-
 
     def __str__(self):
         """ 
@@ -283,7 +277,20 @@ class ZoneNorm(ChromAnalysisExtended):
         else:
             blacklist_msg = self.blacklist
 
-        dist_msg = f"{self.zone_distribution.title()} with {self.zone_param_type.replace('_', ' ')}, "
+        if self.filter_strand:
+            if self.filter_strand == True:
+                filter_msg = "Set to convert BAMs into forward and reverse strand bigWigs"
+            else:
+                filter_msg = f"Set to convert BAMs into {self.filter_strand} strand bigWigs"
+        else:
+            filter_msg = "No strand filtering when converting BAMs to bigWigs"
+
+        if self.spikein_prefix:
+            spikein_msg = f"Spike-in chromosome prefix set as {self.spikein_prefix}"
+        else:
+            spikein_msg = "No spike-in"
+
+        dist_msg = f"{self.zone_distribution.title()} with {self.zone_param_type.replace('_', ' ')} "
         dist_msg += f"parameter type"
 
         if self.verbose >= 0:
@@ -299,6 +306,8 @@ class ZoneNorm(ChromAnalysisExtended):
                    f"   * Number of samples: {len(self.sample_ids)}\n"
                    f"   * Sample names: {', '.join(self.sample_names.values())}\n"
                    f"   * Blacklist: {blacklist_msg}\n"
+                   f"   * Strand filtering: {filter_msg}\n"
+                   f"   * Spike-in: {spikein_msg}\n"
                    f"   * Kernel: {kernel_msg}\n"
                    f"   * Test distributions: {', '.join(self.test_distributions).title().replace('_', ' ')}\n"
                    f"   * Set distribution: {dist_msg}\n"
@@ -445,22 +454,51 @@ class ZoneNorm(ChromAnalysisExtended):
         self.spikein_prefix = spikein_prefix
         self.spikein_reads = spikein_reads
 
-    def setNormMethod(self, norm_method, norm_power = None, scaling_factors = {}):
+    def setNormMethod(self, norm_method, norm_power = None, scaling_factors = {},
+                      scalar_name = "Scalar", zen_from_zones = True, zen_padded_zones = True, 
+                      zen_sample_zones = True):
         """
         Set the normalisation method to apply and its parameters.
 
         params:
-            norm_method:     Signal Normalisation method to apply, i.e. "ZEN", "Scalar", "Power",
-                             "Log", "No normalisation" (bigWig/BAM) or "RPKM", "CPM", "BPM", "RPGC" 
-                             (BAM).
-            norm_power:      If norm_method is set as "Power", set this as a number to raise 
-                             signal to the power of.
-            scaling_factors: If norm_method is set as "Scalar", set this as a number to multiple all 
-                             samples signal by, or a dictionary mapping sample names to numbers.
+            norm_method:      Signal Normalisation method to apply, i.e. "ZEN", "Scalar", "Power",
+                              "Log", "No normalisation" (bigWig/BAM) or "RPKM", "CPM", "BPM", "RPGC" 
+                              (BAM).
+            norm_power:       If norm_method is set as "Power", set this as a number to raise 
+                              signal to the power of.
+            scaling_factors:  If norm_method is set as "Scalar", set this as a number to multiple all 
+                              samples signal by, or a dictionary mapping sample names to numbers.
+            scalar_name:      Can be used to set a custom name for scalar normalisation, e.g. "TMM" 
+                              if TMM scaling factors are given.
+            zen_from_zones:   If running ZEN normalisation, set this as True to calculate statistics 
+                              for rescaling signal from signal within zones, or False to use all
+                              signal.
+            zen_padded_zones: If running ZEN normalisation from zones, set as True to use statistics
+                              from padded zones, or False to use statistics from unpadded zones.
+            zen_sample_zones: If running ZEN normalisation from zones, set as True to use statistics
+                              from sample-specific zones, or False to use statistics from zones 
+                              merged across all samples.
         """
 
         # Scaling factors not yet set
         self.scaling_factors = {}
+        # Set defaults for ZEN
+        self.zen_from_zones = True
+        self.zen_padded_zones = True
+        self.zen_sample_zones = True
+
+        # Set type of statistics to use for ZEN normalisation
+        if not bool(zen_from_zones):
+            self.zen_from_zones = False
+        if not bool(zen_padded_zones):
+            self.zen_padded_zones = False
+        if not bool(zen_sample_zones):
+            self.zen_sample_zones = False
+
+        if isinstance(scalar_name, str):
+            if scalar_name:
+                # Set custom name for scalar normalisation
+                self.scalar_name = scalar_name
 
         if (norm_method is None) or (norm_method == "") or (norm_method.lower()[:2] == "no"):
             self.norm_method = "No normalisation"
@@ -473,20 +511,20 @@ class ZoneNorm(ChromAnalysisExtended):
                     raise ValueError("genome_size must be set to use RPGC normalisation with "
                                      "deepTools bamCoverage")
 
-            if self.norm_method.startswith("SPIKE"):
+            if self.norm_method == "RRPM" or self.norm_method.startswith("SPIKE"):
                 if self.spikein_prefix is None:
-                    raise ValueError("spikein_prefix must be set to use spike-in normalisation")
+                    raise ValueError("spikein_prefix must be set to use RRPM spike-in normalisation")
 
-                self.norm_method = "Spike-in"
+                self.norm_method = "RRPM"
 
                 # Count total read counts across spike-in chromosomes per sample
                 total_spikein_reads = self.getTotalSpikeInReads()
-                # Divide to get Reads Per Million (RPM) mapped reads
-                rpm_spikein_reads = 1000000 / total_spikein_reads
+                # Divide reads by 1 million
+                rrpm_spikein_reads = 1000000 / total_spikein_reads
 
-                # Set scaling factors as spike-in RPM read counts
+                # Set scaling factors as spike-in reference-adjusted reads per million (RRPM) read counts
                 self.scaling_factors = dict(zip(self.getSampleNames(return_custom = False),
-                                                rpm_spikein_reads))
+                                                rrpm_spikein_reads))
 
             if self.norm_method.startswith("SCAL"):
                 self.norm_method = "Scalar"
@@ -553,25 +591,25 @@ class ZoneNorm(ChromAnalysisExtended):
     def setFilterStrand(self, filter_strand):
         if filter_strand is None:
             self.filter_strand = False
-            return
+            return None
         
+        elif isinstance(filter_strand, bool):
+            self.filter_strand = filter_strand
+            return None
+
         elif isinstance(filter_strand, str):
             filter_strand = filter_strand.strip().lower()
             if filter_strand in ["forward", "reverse"]:
                 self.filter_strand = filter_strand
-                return
+                return None
             if filter_strand in ["false", "none", "no", "0"]:
                 self.filter_strand = False
-                return
+                return None
             if filter_strand in ["true", "yes", "1"]:
                 self.filter_strand = True
-                return
-            
-        if isinstance(filter_strand, bool):
-            self.filter_strand = filter_strand
-            return
+                return None
         
-        raise ValueError('filter_strand must be set as either: "forward", "reverse", "True" or "False"')
+        raise ValueError('filter_strand must be set as either: "forward", "reverse", True or False')
 
     def setExcludeZero(self, exclude_zero):
         try:
@@ -585,14 +623,6 @@ class ZoneNorm(ChromAnalysisExtended):
             self.zone_remove_percent = max(int(zone_remove_percent), 0)
         except:
             raise ValueError("zone_remove_percent must be set as an integer value, e.g. 10")
-
-    def setNormStatsType(self, norm_stats_type):
-        if norm_stats_type not in self.supported_norm_stats_types:
-            raise ValueError(f"Invalid norm_stats_type {norm_stats_type}."
-                             f"norm_stats_type must be set as either "
-                             f'{", ".join(self.supported_norm_stats_types)}')
-        else:
-            self.norm_stats_type = norm_stats_type
 
     def setDeletionSize(self, deletion_size):
         try:
@@ -740,17 +770,24 @@ class ZoneNorm(ChromAnalysisExtended):
         except:
             raise ValueError("merge_depth must be set as an integer between 0 to 10000")
 
-    def setMinDifferentBPs(self, min_different_bps):
+    def setMinRegionBPs(self, min_region_bps, min_different_bps):
         try:
-            self.min_different_bps = max(1, min(int(min_different_bps), 100))
-        except:
-            raise ValueError("min_different_bps must be set as an integer between 1 to 1000")
-
-    def setMinRegionBPs(self, min_region_bps):
-        try:
-            self.min_region_bps = max(10, min(int(min_region_bps), 10000))
+            min_region_bps = max(10, min(int(min_region_bps), 10000))
         except:
             raise ValueError("min_region_bps must be set as an integer between 10 and 10000")
+
+        try:
+            min_different_bps = max(1, min(int(min_different_bps), 100))
+        except:
+            raise ValueError("min_different_bps must be set as an integer between 1 to 100")
+
+        # Check that the number of base pairs that meet the quality threshold does not exceed 
+        # the minimum number required to call a region
+        if min_different_bps > min_region_bps:
+            min_different_bps = min_region_bps
+
+        self.min_region_bps = min_region_bps
+        self.min_different_bps = min_different_bps
 
     def setQualityFilter(self, quality_filter):
         if isinstance(quality_filter, bool):
@@ -846,7 +883,7 @@ class ZoneNorm(ChromAnalysisExtended):
         if extend_reads:
             command.append("--extendReads")
 
-        if norm_method not in ["Scalar", "Spike-in", "No Normalisation"]:
+        if norm_method not in ["Scalar", "RRPM", "No Normalisation"]:
             if norm_method in self.deeptools_norm_methods:
                 command.extend(["--normalizeUsing", str(norm_method)])
 
@@ -915,7 +952,7 @@ class ZoneNorm(ChromAnalysisExtended):
             effective_genome_size: Size of mapped genome (required if using RPGC normalisation).
             extend_reads:          Set as False to disable read extension.
             filter_strand:         Set as False to disable strand filtering, True to use both 
-                                   strands, or set as "forward" or "reverse".
+                                   strands, or "forward" or "reverse" for a specific strand.
             replace_existing:      Whether to overwrite previously created files.
         """
 
@@ -929,7 +966,7 @@ class ZoneNorm(ChromAnalysisExtended):
         elif norm_method not in self.bam_norm_methods:
             raise ValueError(f"{self.norm_method} is not supported for deepTools bamCoverage")
 
-        if self.norm_method in ["Scalar", "Spike-in"]:
+        if norm_method in ["Scalar", "RRPM"]:
             # Set sample specific scaling factors to multiple signal by
             set_scalars = True
         else:
@@ -937,8 +974,15 @@ class ZoneNorm(ChromAnalysisExtended):
             set_scalars = False
 
         if norm_method != "No Normalisation":
-            output_prefix = f"_{norm_method}"
-            output_directory = os.path.join(self.output_directories["bigwig"], norm_method)
+            if norm_method == "Scalar":
+                # Allow a custom normalisation name to be used when saving bigWig
+                norm_name = self.scalar_name
+            else:
+                norm_name = norm_method
+
+            output_prefix = f"_{norm_name}"
+            output_directory = os.path.join(self.output_directories["bigwig"], norm_name)
+
         else:
             output_prefix = ""
             output_directory = os.path.join(self.output_directories["bigwig"], "No_Normalisation")
@@ -1109,8 +1153,10 @@ class ZoneNorm(ChromAnalysisExtended):
                         custom_sample_name = sample_name
 
                     # Add positive and negative varients
-                    self.sample_names[f"{sample_name}_Pos"] = f"{custom_sample_name}_Pos"
-                    self.sample_names[f"{sample_name}_Neg"] = f"{custom_sample_name}_Neg"
+                    if (filter_strand == "forward") or (filter_strand == True):
+                        self.sample_names[f"{sample_name}_Pos"] = f"{custom_sample_name}_Pos"
+                    if (filter_strand == "reverse") or (filter_strand == True):
+                        self.sample_names[f"{sample_name}_Neg"] = f"{custom_sample_name}_Neg"
 
                 self.file_sample_names = [s.replace("_", "-").replace(".", "-") for 
                                           s in self.sample_names.keys()]
@@ -1337,7 +1383,15 @@ class ZoneNorm(ChromAnalysisExtended):
                     # Open the statistics
                     stats_df = pd.read_csv(file_name, compression = compression)
             else:
-                stats_df = pd.read_csv(file_name, compression = compression)
+                try:
+                    stats_df = pd.read_csv(file_name, compression = compression)
+                except:
+                    time.sleep(1)
+                    try:
+                        # Try read CSV again as exception could have occured due to race condition
+                        stats_df = pd.read_csv(file_name, compression = compression)
+                    except Exception as e:
+                        raise Exception(f"Could not read {stats_type} statistics due to exception: {e}")
 
             if not get_mean_stats:
                 # Ensure chromosome column is correct type
@@ -1417,56 +1471,84 @@ class ZoneNorm(ChromAnalysisExtended):
         # Convert from sample ID to name
         sample_names = np.array(self.getSampleNames(return_custom = True))[sample_ids]
 
+        if not file_name:
+            file_name = os.path.join(self.output_directories["output_stats"], "combined-signal-stats.csv")
+
         # Open the combined statistics calculated for the signal
         stats_df = self.getSignalStats(file_name = file_name)
 
-        for column in ["sample", "chrom", "signal_type", "mean"]:
-            if column not in stats_df.columns:
-                raise ValueError(f'Combined signal statistics is missing column "{column}"')
+        # Repeat until all statisics found or errors persist after two attempts
+        invalid_stats = True
+        max_attemps = 2
+        attempts = 0
 
-        # Extract rows for the specified signal and samples
-        stats_df = stats_df.loc[(stats_df["signal_type"] == signal_type) &
-                                (stats_df["sample"].isin(sample_names))]
+        while invalid_stats and (attempts < max_attemps):
+            if not isinstance(stats_df, pd.DataFrame):
+                raise ValueError(f"stats_df was opened as a {type(stats_df)}, but should be a DataFrame")
 
-        if len(stats_df) == 0:
-            # Force recreation of file if missing rows
-            stats_df = self.getSignalStats(file_name = file_name, replace_existing = True)
+            expected_cols = set(["sample", "chrom", "signal_type", "fragmentEstimate", "mean"])
+            missing_cols = expected_cols - set(stats_df.columns)
+            n_missing_cols = len(missing_cols)
+
+            if n_missing_cols > 0:
+                raise ValueError(f"Combined signal statistics is missing {n_missing_cols} "
+                                 f"column{'s' if n_missing_cols != 1 else ''}: {missing_cols}")
+
+            # Extract rows for the specified signal and samples
             stats_df = stats_df.loc[(stats_df["signal_type"] == signal_type) &
                                     (stats_df["sample"].isin(sample_names))]
-            
+
             if len(stats_df) == 0:
-                raise ValueError(f"No rows found in combined signal statistics with signal "
-                                 f'type "{signal_type}"')
+                if attempts < max_attemps:
+                    # Force recreation of file if missing rows
+                    stats_df = self.getSignalStats(file_name = file_name, replace_existing = True)
+                    # Repeat validation on new file
+                    attempts += 1
+                    continue
+                else:
+                    raise ValueError(f"No rows found in combined signal statistics with signal "
+                                    f'type "{signal_type}"')
 
-        try:
-            # Calculate average mean across chromosomes per sample
-            global_mean_df = pd.DataFrame(stats_df.groupby(["sample"])["mean"].mean())
-            # Reorder to ensure samples match bigWig IDs
-            global_mean_df = global_mean_df.reindex(sample_names).reset_index()
-            global_means = np.array(global_mean_df["mean"])
+            try:
+                # Calculate average mean across chromosomes per sample
+                global_mean_df = pd.DataFrame(stats_df.groupby(["sample"])["mean"].mean())
+                # Reorder to ensure samples match bigWig IDs
+                global_mean_df = global_mean_df.reindex(sample_names).reset_index()
+                global_means = np.array(global_mean_df["mean"])
 
-            # Extract rows for the chromosome
-            stats_df = stats_df.loc[stats_df["chrom"] == chromosome]
-            # Keep only sample names, estimated fragment size and non-zero mean
-            stats_df = stats_df[["sample", "fragmentEstimate", "mean"]]
+                # Extract rows for the chromosome
+                stats_df = stats_df.loc[stats_df["chrom"] == chromosome]
+                # Keep only sample names, estimated fragment size and non-zero mean
+                stats_df = stats_df[["sample", "fragmentEstimate", "mean"]]
 
-        except Exception as e:
-            print(f"Could not extract global and {chromosome} statistics from "
-                  f'"{file_name}" due to exception: ')
-            print(e)
-            return None
+            except Exception as e:
+                print(f"Could not extract global and {chromosome} statistics from "
+                    f'"{file_name}" due to exception: ')
+                print(e)
+                return None
 
-        row_sample_names = np.array(stats_df["sample"])
-        chrom_fragments = np.array(stats_df["fragmentEstimate"])
-        chrom_means = np.array(stats_df["mean"])
+            row_sample_names = np.array(stats_df["sample"])
+            chrom_fragments = np.array(stats_df["fragmentEstimate"])
+            chrom_means = np.array(stats_df["mean"])
 
-        # Check if any samples missing in the stats data
-        missing_samples = np.setdiff1d(sample_names, row_sample_names)
-        n_missing = len(missing_samples)
+            # Check if any samples missing in the stats data
+            missing_samples = np.setdiff1d(sample_names, row_sample_names)
+            n_missing = len(missing_samples)
 
-        if n_missing > 0:
-            raise ValueError(f"Cannot find {n_missing} sample{'s' if n_missing != 1 else ''} for {chromosome} in "
-                             f'combined-signal-stats.csv: {", ".join(missing_samples)}')
+            if n_missing > 0:
+                if attempts < max_attemps:
+                    stats_df = self.combineStats(stats_type = "signal", file_name = file_name, return_df = True)
+                    # Repeat validation on new file
+                    attempts += 1
+                    continue
+
+                else:
+                    error_message = f"Cannot find {n_missing} sample{'s' if n_missing != 1 else ''} "
+                    error_message += f"for {chromosome} in combined-signal-stats.csv: "
+                    error_message += ", ".join(missing_samples)
+                    raise ValueError(error_message)
+            
+            invalid_stats = False
 
         # Sort rows by sample to ensure stats align
         stats_df["sample"] = pd.Categorical(stats_df["sample"], categories = sample_names,
@@ -2658,6 +2740,22 @@ class ZoneNorm(ChromAnalysisExtended):
 
         return self.loadCompressed(file_name, compression = "xz")
 
+    @staticmethod
+    def saveBigBed(bed_file, chrom_sizes_file, subprocess_verbose = None):
+        """
+        Convert a BED file to a bigBed file.
+
+        params:
+            chrom_sizes_file:   Path to file of tab separated chromosomes and sizes.
+            subprocess_verbose: Verbose of stdout when running subprocess.
+        """
+
+        bigbed_file = f"{os.path.splitext(bed_file)[0]}.bb"
+        command = ["bedToBigBed", bed_file, chrom_sizes_file, bigbed_file]
+
+        # Run bedToBigBed
+        subprocess.run(command, stdout = subprocess_verbose)
+
     def testDistributions(self, chromosomes = [], log_transform = None, downsample_size = None, 
                           replace_existing = False):
         """
@@ -2676,11 +2774,13 @@ class ZoneNorm(ChromAnalysisExtended):
 
         # Create tuples of chromosomes and samples to process
         process_chrom_bws = []
+        signal_stats_folders = {}
 
         for chrom in chromosomes:
-            signal_stats_folder = os.path.join(self.output_directories["signal_stats"], chrom)
+            chrom_stats_folder = os.path.join(self.output_directories["signal_stats"], chrom)
+            signal_stats_folders[chrom] = chrom_stats_folder
 
-            if not os.path.exists(signal_stats_folder):
+            if not os.path.exists(chrom_stats_folder):
                 # Cannot test distributions if signal statistics not yet created
                 raise FileNotFoundError(f"No signal statistics yet calculated for {chrom}.\n"
                                         f"First run convolveSignals.")
@@ -2719,7 +2819,7 @@ class ZoneNorm(ChromAnalysisExtended):
                     for chrom, bw_idx in process_chrom_bws:
                         # Set files
                         file_sample_name = self.file_sample_names[bw_idx]
-                        signal_stats_file = os.path.join(signal_stats_folder,
+                        signal_stats_file = os.path.join(signal_stats_folders[chrom],
                                                          f"signal-stats_{file_sample_name}.csv.gz")
                         dist_stats_file = os.path.join(self.output_directories["dist_stats"], chrom,
                                                        f"distribution-stats_{file_sample_name}.csv.gz")
@@ -2741,7 +2841,7 @@ class ZoneNorm(ChromAnalysisExtended):
                 # Run sequentially rather than using parallelisation
                 for chrom, bw_idx in process_chrom_bws:
                     file_sample_name = self.file_sample_names[bw_idx]
-                    signal_stats_file = os.path.join(signal_stats_folder,
+                    signal_stats_file = os.path.join(signal_stats_folders[chrom],
                                                      f"signal-stats_{file_sample_name}.csv.gz")
                     dist_stats_file = os.path.join(self.output_directories["dist_stats"], chrom,
                                                    f"distribution-stats_{file_sample_name}.csv.gz")
@@ -3994,7 +4094,8 @@ class ZoneNorm(ChromAnalysisExtended):
                     print(f"Merging created {len(merged_zones)} regions")
                 else:
                     print(f"Merging created {len(merged_zones)} "
-                          f"{'padded' if padded_zones else 'unpadded'} zones")
+                          f"{'padded' if padded_zones else 'unpadded'} zones "
+                          f"for {chromosome}")
 
         else:
             # Set as empty array to record that no reliable signal was detected 
@@ -4483,6 +4584,147 @@ class ZoneNorm(ChromAnalysisExtended):
                              signal_type = signal_type,
                              file_name = signal_stats_file)
 
+    def createZoneBED(self, zone_type = "padded", create_bigbed = False, chrom_sizes_file = None, 
+                      name_postfix = "", desc_postfix = "", file_postfix = ""):
+        """
+        Save zones to BED file for visualisation in a genome browser.
+
+        params:
+            zone_type:        Set as either 'padded' or 'unpadded'.
+            create_bigbed:    Set as True to also save a bigBed file.
+            chrom_sizes_file: Path to file of tab separated chromosomes and sizes for creating bigBed.
+            name_postfix:     Postfix text to add to end of name in BED header.
+            desc_postfix:     Postfix text to add to end of description in BED header.
+            file_postfix:     Postfix text to add to end of BED file name.
+        """
+
+        chrom_col, start_col, end_col = self.region_coords_cols
+        sample_names = np.array(self.getSampleNames(return_custom = True))
+
+        zone_type = zone_type.lower()
+        if zone_type not in ["padded", "unpadded"]:
+            raise ValueError(f"Unsupported zone_type {zone_type}.")
+
+        if create_bigbed:
+            if chrom_sizes_file is None:
+                chrom_sizes_file = os.path.join(self.output_directories["bed"],
+                                                f'{self.analysis_name.replace(" ", "_")}.chrom.sizes')
+
+                if not os.path.exists(chrom_sizes_file):
+                    self.createChromSizes(chrom_sizes_file)
+
+            else:
+                if os.path.exists(chrom_sizes_file):
+                    raise FileNotFoundError(f'chrom_sizes_file "{chrom_sizes_file}" does not exist')
+
+            if self.verbose > 0:
+                subprocess_verbose = None
+            else:
+                # Disable any printing
+                subprocess_verbose = subprocess.DEVNULL
+
+
+        if file_postfix:
+            file_postfix = file_postfix.replace(" ", "_")
+
+        if self.verbose > 0:
+            if create_bigbed:
+                print(f"Saving zones to BED and bigBed files")
+            else:
+                print(f"Saving zones to BED files")
+
+        results_bed_dir = os.path.join(self.output_directories["bed"], "Zones")
+
+        # Create new directory to store BED files
+        os.makedirs(results_bed_dir, exist_ok = True)
+
+        # Create empty dictionary to record each zone coordinates per sample
+        all_sample_zones = {}
+        all_sample_chroms = {}
+
+        for bw_idx in self.sample_ids:
+            all_sample_zones[bw_idx] = np.empty((0,2), dtype = np.uint32)
+            all_sample_chroms[bw_idx] = {"chroms": [], "n_repeats": []}
+
+        for chrom in self.chromosomes:
+            chrom_signal_zones = self.getSampleZones(chrom)[zone_type]
+
+            if len(chrom_signal_zones) > 0:
+                for bw_idx in self.sample_ids:
+                    # Extract the zones for a specific sample for the chromosome
+                    sample_name = sample_names[bw_idx]
+                    sample_zones = chrom_signal_zones[sample_name]
+                    n_sample_zones = len(sample_zones)
+
+                    # Add zones to the dictionary
+                    all_sample_zones[bw_idx] = np.concatenate((all_sample_zones[bw_idx], sample_zones))
+                    # Record the chromosome name and the number of zones
+                    all_sample_chroms[bw_idx]["chroms"].append(chrom)
+                    all_sample_chroms[bw_idx]["n_repeats"].append(n_sample_zones)
+
+            elif self.verbose > 0:
+                print(f"Warning: No zones found for {chrom}")
+
+        if all(zones.shape[0] == 0 for zones in all_sample_zones.values()):
+            raise ValueError("No zones found for any chromosome")
+
+        for bed_idx in self.sample_ids:
+            # Only create a BED file if values are present
+            write_bed = False
+            # Use single sample's name
+            sample_name = sample_names[bed_idx]
+            # Get zone coordinates for the sample
+            all_coords = all_sample_zones[bed_idx]
+
+            if all_coords.shape[0] > 0:
+                write_bed = True
+                # Get values to create the chromosome column
+                bed_chroms = all_sample_chroms[bed_idx]["chroms"]
+                n_chrom_repeats = all_sample_chroms[bed_idx]["n_repeats"]
+
+            if write_bed:
+                # Set the file name to save to
+                bed_file = f"{zone_type}_zones_{sample_name}"
+                if file_postfix:
+                    bed_file += f"_{file_postfix}.bed"
+                else:
+                    bed_file += ".bed"
+                bed_file_path = os.path.join(results_bed_dir, bed_file)
+
+                # Set the header
+                track_name = sample_name
+
+                if name_postfix:
+                    track_name += f" {name_postfix}"
+
+                description = f"{zone_type.title()} zones for {sample_name}"
+
+                if desc_postfix:
+                    description += f" {name_postfix}"
+
+                # Format the coordinates as a DataFrame
+                result_row_names = [f"{sample_name}_{zone_type}_zones_{i}" for 
+                                    i in range(1, all_coords.shape[0] + 1)]
+                contents_df = pd.DataFrame({chrom_col: np.repeat(bed_chroms, n_chrom_repeats),
+                                            start_col: all_coords[:,0],
+                                            end_col: all_coords[:,1],
+                                            "name": result_row_names})
+
+                # Write results to BED file
+                self.saveBED(file_name = bed_file_path, 
+                             contents_df = contents_df,
+                             track_name = track_name,
+                             description = description,
+                             use_score = False)
+
+                if create_bigbed:
+                    self.saveBigBed(bed_file = bed_file_path,
+                                    chrom_sizes_file = chrom_sizes_file,
+                                    subprocess_verbose = subprocess_verbose)
+                    
+            elif self.verbose > 0:
+                print(f"Skipping creating BED file for {sample_name} as no {zone_type} zones were found")
+
     def normaliseChromSignal(self, bw_idx, chromosome, sample_norm_stats = None, file_name = ""):
         """
         Transform signal for a sample chromosome.
@@ -4515,7 +4757,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                  "a dictionary mapping sample names to numbers")
 
         if self.verbose > 0:
-            if self.norm_method in ["Scalar", "Spike-in"]:
+            if self.norm_method in ["Scalar", "RRPM"]:
                 norm_message = f"Multiplying signal by {scale_factor}"
             elif self.norm_method == "Power":
                 norm_message = f"Raising signal to the power of {self.norm_power} for"
@@ -4569,12 +4811,11 @@ class ZoneNorm(ChromAnalysisExtended):
         else:
             return signal
         
-    def normaliseSignal(self, norm_stats_type = None, replace_existing = False):
+    def normaliseSignal(self, replace_existing = False):
         """
         Use an inbuilt normalisation method to rescale the bigWig signal.
 
         params:
-            norm_stats_type:  Statistics type to use if using ZEN normalisation.
             replace_existing: Whether to overwrite previously created files.
         """
 
@@ -4603,11 +4844,6 @@ class ZoneNorm(ChromAnalysisExtended):
                 if self.verbose > 0:
                     print("bigWigs created from BAMs were already scalar normalised")
                 return None
-
-        if norm_stats_type is None:
-            norm_stats_type = self.norm_stats_type
-        else:
-            self.setNormStatsType(norm_stats_type)
 
         create_normalised_signal = True
         main_norm_dir = os.path.join(self.output_directories["norm_signal"], self.norm_method)
@@ -4649,6 +4885,23 @@ class ZoneNorm(ChromAnalysisExtended):
             else:
                 use_signal_stats = True
                 sample_norm_stats = {}
+
+                # Set name to locate type of statistics to use for ZEN normalisation
+                norm_stats_type = "signal"
+
+                if self.zen_from_zones:
+                    if self.zen_padded_zones:
+                        # Use zones rounded up to bins
+                        norm_stats_type += "_padded"
+                    else:
+                        # Use zones without rounding
+                        norm_stats_type += "_unpadded"
+                    if self.zen_sample_zones:
+                        # Use sample-specific zone predictions
+                        norm_stats_type += "_sample_zones"
+                    else:
+                        # Use zones merged across all samples
+                        norm_stats_type += "_merged_zones"
 
                 # Recreate signal statistics
                 signal_stats = self.getSignalStats(replace_existing = True)
@@ -4916,8 +5169,12 @@ class ZoneNorm(ChromAnalysisExtended):
         else:
             # Check that the file exists
             if not os.path.isfile(file_name):
-                raise ValueError(f"Signal statistics file does not exist for {custom_sample_name} "
-                                 f"{chromosome}")
+                # Wait then try search for the file again
+                time.sleep(3)
+
+                if not os.path.isfile(file_name):
+                    raise FileNotFoundError(f'Signal statistics file "{file_name}" does not exist for '
+                                            f'{custom_sample_name} {chromosome}')
                 
             # Check if the file is empty
             if os.path.getsize(file_name) == 0:
@@ -4943,11 +5200,22 @@ class ZoneNorm(ChromAnalysisExtended):
             try:
                 # Read non-empty file
                 stats_df = pd.read_csv(file_name)
-            except Exception as e:
-                # Catch unexpected errors
-                print(f"Could not read signal statistics for {custom_sample_name} {chromosome} "
-                      f'from file "{file_name}" due to exception:')
-                raise e
+                
+            except:
+                # Wait then try read the file again
+                time.sleep(3)
+
+                try:
+                    stats_df = pd.read_csv(file_name)
+
+                except Exception as e:
+                    error_message = f'Could not read signal statistics for {custom_sample_name} {chromosome} '
+                    error_message += f'from file "{file_name}" due to exception: "{e}"'
+
+                    # Remove file due to persistent error
+                    os.remove(file_name)
+                    # Catch unexpected errors
+                    raise Exception(error_message)
 
             # Check if entry already exists for the signal type
             if signal_type in np.array(stats_df["signal_type"]):
@@ -5106,16 +5374,40 @@ class ZoneNorm(ChromAnalysisExtended):
                     try:
                         # Attempt to read the statistics for the sample for a specific chromosome
                         stats_df = pd.read_csv(stats_file, compression = "gzip")
-                        n_rows = len(stats_df)
+
+                    except:
+                        time.sleep(1)
+
+                        try:
+                            # Try read CSV again as exception could have occured due to race condition
+                            stats_df = pd.read_csv(stats_file, compression = "gzip")
+
+                        except Exception as e:
+                            # Delete the file as it is likely corrupted
+                            os.remove(stats_file)
+
+                            error_message = f'Could not read {stats_type} statistics for {custom_sample_name} '
+                            error_message += f'{chrom} due to exception:\n"{e}".\n'
+                            error_message += f'File "{stats_file}" has been removed and can be recreated by '
+
+                            if stats_type == "signal":
+                                error_message += 'running convolveSignals again.'
+                            else:
+                                error_message += 'running testDistributions again.'
+
+                            raise error_message
+
+                    n_rows = len(stats_df)
+
+                    if n_rows > 0:
                         # Add columns for sample name and chromosome
                         stats_df.insert(0, "chrom", [chrom] * n_rows)
                         stats_df.insert(0, "sample", [custom_sample_name] * n_rows)
                         combined_stats.append(stats_df)
 
-                    except Exception as e:
-                        print(f"Could not read {stats_type} statistics for {custom_sample_name} "
-                              f"{chrom} due to exception:")
-                        raise e
+                    else:
+                        raise ValueError(f"{stats_type} statistics are missing for {custom_sample_name} {chrom}")
+
                 else:
                     if self.verbose > 0:
                         print(f"Warning: Could not read {stats_type} statistics for "
@@ -5141,64 +5433,6 @@ class ZoneNorm(ChromAnalysisExtended):
 
         if return_df:
             return combined_stats_df
-
-    def combineDistributionStats(self, file_name = "", return_df = False):
-        """
-        Combine distribution statistics across samples into a CSV.
-
-        params:
-            file_name: Can specify a file name to read statistics CSV from. Otherwise uses default file.
-            return_df: Set as True to return the updated statistics DataFrame.
-        """
-
-        custom_sample_names = np.array(self.getSampleNames(return_custom = True))
-        file_sample_names = self.file_sample_names
-
-        if file_name == "" and (not return_df):
-            file_name = os.path.join(self.output_directories["output_stats"], 
-                                    "combined-distribution-stats.csv")
-            # Make directory if does not exist
-            os.makedirs(self.output_directories["output_stats"], exist_ok = True)
-
-        # Record the distribution statistics per sample per chromosome
-        combined_dist_stats = []
-
-        for bw_idx in self.sample_ids:
-            file_sample_name = file_sample_names[bw_idx]
-            custom_sample_name = custom_sample_names[bw_idx]
-
-            for chrom in self.chromosomes:
-                dist_stats_file = os.path.join(self.output_directories["dist_stats"], chrom, 
-                                               f"distribution-stats_{file_sample_name}.csv.gz")
-                
-                if os.path.isfile(dist_stats_file):
-                    try:
-                        # Attempt to read the distribution statistics for the sample for a specific 
-                        # chromosome
-                        dist_df = pd.read_csv(dist_stats_file)
-                        n_rows = len(dist_df)
-                        # Add columns for sample name and chromosome
-                        dist_df.insert(0, "chrom", [chrom] * n_rows)
-                        dist_df.insert(0, "sample", [custom_sample_name] * n_rows)
-                        combined_dist_stats.append(dist_df)
-
-                    except Exception as e:
-                        print(f"Could not read distribution statistics for {custom_sample_name} "
-                              f"{chrom} due to exception:")
-                        raise e
-                else:
-                    if self.verbose > 0:
-                        print(f"Warning: Could not read distribution statistics for "
-                              f"{custom_sample_name} {chrom} as file does not exist")
-
-        # Combine list of dataframes
-        combined_dist_stats_df = pd.concat(combined_dist_stats)
-
-        if file_name:
-            combined_dist_stats_df.to_csv(file_name, header = True, index = False)
-
-        if return_df:
-            return combined_dist_stats_df
 
     def mergeChromSignal(self, chromosome, sample_ids):
         """
@@ -5328,10 +5562,10 @@ class ZoneNorm(ChromAnalysisExtended):
         Create a bigWig of binned signal for a sample.
 
         params:
-            bw_idx:   Sample ID for sample to bin signal for.
+            bw_idx:       Sample ID for sample to bin signal for.
             file_name:    Name of bigWig file to save signal to.
             directory:    Full directory with folder to save the file to.
-            bin_size: Size of each bin to separate signal into.
+            bin_size:     Size of each bin to separate signal into.
         """
 
         if file_name == "":
@@ -5352,10 +5586,15 @@ class ZoneNorm(ChromAnalysisExtended):
         bigwig_chroms = {c: bigwig_chroms[c] for c in self.chromosomes if c in bigwig_chroms}
         # Calculate chromosome sizes rounded up to a multiple of bin size
         chromosomes = np.array(list(bigwig_chroms.keys()))
-        binned_chrom_sizes = np.array([int(np.ceil(s / bin_size)) * bin_size for s in bigwig_chroms.values()], dtype = np.uint32)
+        binned_chrom_sizes = np.array([int(np.ceil(s / bin_size)) * bin_size for 
+                                       s in bigwig_chroms.values()], dtype = np.uint32)
 
         # Create file if doesn't exist
         open(file_name, "w").close()
+
+        if self.verbose > 0:
+            sample_name = self.getSampleNames(return_custom = True)[bw_idx]
+            print(f"Saving binned bigWig for {sample_name} with bin size {bin_size}")
 
         # Write signal to bigWig
         write_bigwig = pyBigWig.open(file_name, "w")
@@ -5554,17 +5793,20 @@ class ZoneNorm(ChromAnalysisExtended):
             calculate_stats:    Whether to include dictionary of signal statistics in output.
         """
 
-        sample_name = self.getSampleNames(return_custom = True)[bw_idx]
-
         # Open the fitted distribution statistics
         dist_stats_file = os.path.join(self.output_directories["dist_stats"],
                                        chromosome,
                                        f"distribution-stats_{self.file_sample_names[bw_idx]}.gz")
 
         if not os.path.isfile(dist_stats_file):
-            raise FileNotFoundError(f"Distribution statistics not found for {chromosome} {sample_name}")
+            # Create combined distribution statistics if does not yet exist
+            dist_stats_df = self.combineStats(stats_type = "distribution",
+                                              file_name = dist_stats_file,
+                                              return_df = True)
+        else:
+             # Read from file
+            dist_stats_df = pd.read_csv(dist_stats_file)
 
-        dist_stats_df = pd.read_csv(dist_stats_file)
         all_distributions = np.unique(dist_stats_df["distribution"])
 
         if len(plot_distributions) == 0:
@@ -5726,8 +5968,6 @@ class ZoneNorm(ChromAnalysisExtended):
         signal_to_fit = plot_values["signal_to_fit"]
         # Distribution statistics for the sample's chromosome
         dist_stats_df = plot_values["dist_stats_df"]
-        # Contains mean, median, SD and MAD
-        signal_stats = plot_values["signal_stats"]
         del plot_values
 
         # Find the unique parameter combinations
@@ -5775,9 +6015,6 @@ class ZoneNorm(ChromAnalysisExtended):
         else:
             set_y_lims = False
 
-        # Set colours for statistic lines
-        average_colour = "black"
-        deviation_colour = "red"
         # Line transparency
         line_alpha = 0.8
 
@@ -5794,7 +6031,9 @@ class ZoneNorm(ChromAnalysisExtended):
 
             # Set the title as the parameter type
             param_type = param_types[ax_idx]
-            ax.set_title(param_type.replace("_", " ").title())
+            sub_plot_title = param_type.replace("_", " ").title()
+            sub_plot_title = sub_plot_title.replace("Scipy", "SciPy")
+            ax.set_title(sub_plot_title)
 
             if set_x_lims:
                 ax.set_xlim(x_limits[0], x_limits[1])
@@ -5807,23 +6046,6 @@ class ZoneNorm(ChromAnalysisExtended):
             else:
                 # Hide the y-axis label
                 ax.tick_params(left = False, labelleft = False)
-
-            if param_type == "mean_fit":
-                ax.axvline(x = signal_stats["mean"], color = average_colour, 
-                           linestyle = "-", alpha = line_alpha,
-                           label = f'Mean = {round(signal_stats["mean"], 3)}')
-                ax.axvline(x = signal_stats["SD"], color = deviation_colour, 
-                           linestyle = "-", alpha = line_alpha,
-                           label = f'SD = {round(signal_stats["SD"], 3)}')
-                ax.legend()
-            elif param_type == "median_fit":
-                ax.axvline(x = signal_stats["median"], color = average_colour, 
-                           alpha = line_alpha, linestyle = "-", 
-                           label = f'Median = {round(signal_stats["median"], 3)}')
-                ax.axvline(x = signal_stats["MAD"], color = deviation_colour, 
-                           alpha = line_alpha, linestyle = "-", 
-                           label = f'MAD = {round(signal_stats["MAD"], 3)}')
-                ax.legend()
 
         for dist_name in plot_distributions:
             # Get rows for the fitted distribution
@@ -5853,7 +6075,8 @@ class ZoneNorm(ChromAnalysisExtended):
                 dist = self.scipy_distributions[dist_name]
                 pdf = dist.pdf(x, loc = location, scale = scale)
                 # Plot the fitted distribution
-                ax.plot(x, pdf, label = dist_title, linewidth = 1.5, color = dist_colour, alpha = 0.9)
+                ax.plot(x, pdf, label = f"{dist_title}({round(location, 3)}, {round(scale, 3)})", 
+                        linewidth = 1.5, color = dist_colour, alpha = 0.9)
 
                 if plot_zone_threshold:
                     # Translate from probability to threshold to compare against signal
@@ -5863,10 +6086,23 @@ class ZoneNorm(ChromAnalysisExtended):
                                                                  scale = scale,
                                                                  zone_probability = zone_probability,
                                                                  reverse_transform = False)
-                    # Add the threshold line
-                    ax.axvline(x = np.abs(zone_threshold), color = dist_colour,
-                               alpha = line_alpha, linestyle = "--", 
-                               label = f"{dist_title} Zone Threshold")
+
+                    # Add threshold line
+                    ax.axvline(x = np.abs(zone_threshold), color = dist_colour, alpha = line_alpha, 
+                               linestyle = "--", label = None)
+
+        for ax_idx, ax in enumerate(axes):
+            if plot_zone_threshold:
+                if self.log_transform:
+                    threshold_name = rf"$\ln(\lambda_{{{chromosome}}})$"
+                else:
+                    threshold_name = rf"$\lambda_{{{chromosome}}}$"
+
+                # Add the threshold line label
+                ax.plot([], [], color = "black", alpha = line_alpha, linestyle = "--", 
+                        label = threshold_name)
+
+            ax.legend()
 
         # Set title above plots
         if title:
