@@ -26,17 +26,7 @@ Zone Equilisation Normalisation (ZEN) is a method for normalising bigWigs of gen
 
 <a id="installation"></a>
 ## 1. Installation
-ZEN-norm is designed to run on Python 3.10 and above. It is installable from either PyPI or Conda.
-
-<a id=""></a>
-<details open="open">
-  <summary><b>PyPI Installation</b></summary>
-  To install the ZEN-norm package from <a href="https://pypi.org/project/ZEN-norm/">PyPI</a>, run the command below:
-
-```
-pip install ZEN-norm
-```
-</details>
+ZEN-norm is designed to run on Python 3.10 and above. It is installable from either Conda (recommended) or PyPI.
 
 <a id=""></a>
 <details open="open">
@@ -47,12 +37,24 @@ pip install ZEN-norm
 conda install tommakesthings::zen-norm
 ```
 
-  Alternatively, if there are issues installing ZEN-norm, a conda environment with the required packages can be created using the <code>zen_environment.yml</code> file.
+  If there are issues installing ZEN-norm, a conda environment with the required packages can be created with the <code>zen_environment.yml</code> file.
 
   ```
   conda env create --name zen_env --file=environment/zen_environment.yml
   conda activate zen_env
   ```
+</details>
+
+<a id=""></a>
+<details open="open">
+  <summary><b>PyPI Installation</b></summary>
+  To install the ZEN-norm package from <a href="https://pypi.org/project/ZEN-norm/">PyPI</a>, run the command below:
+
+```
+pip install ZEN-norm
+```
+
+  Some ZEN-norm features require samtools, which is not distributed via PyPI and must be installed separately. 
 </details>
 
 <br>
