@@ -2978,13 +2978,14 @@ class ZoneNorm(ChromAnalysisExtended):
                 process_chrom_bws.append((chrom, bw_idx))
 
         if len(process_chrom_bws) > 0:
+            # Delete pre-existing distribution statistics
             combined_dist_stats_file = os.path.join(self.output_directories["output_stats"], 
                                                     "combined-distribution-stats.csv")
-                                                    
+            
             if os.path.exists(combined_dist_stats_file):
-                # Delete pre-existing distribution statistics
+                # Delete combined statistics
                 os.remove(combined_dist_stats_file)
-                
+
             # Update attributes if different parameters given
             if downsample_size is None:
                 downsample_size = self.downsample_size
@@ -3288,8 +3289,10 @@ class ZoneNorm(ChromAnalysisExtended):
         # Check whether to return results or save to file
         if signal_stats_file or dist_stats_file:
             save_to_file = True
-        else:
-            save_to_file = False
+
+            if os.path.exists(dist_stats_file):
+                # Delete to overwrite file
+                os.remove(dist_stats_file)
 
         # Test if smoothing was applied
         if self.kernel is not None:
