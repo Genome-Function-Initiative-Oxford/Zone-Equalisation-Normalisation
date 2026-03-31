@@ -60,4 +60,8 @@ pip install ZEN-norm
 
 <a id="tutorials"></a>
 ## 2. Tutorials
-For tutorials explaining how to use ZEN for reversing prior normalisation, normalising bigWigs with ZEN and evaluating normalisation methods via Wasserstein distance, see the <a href="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/tree/main/tutorials">Tutorials</a> page on GitHub.
+See the <a href="https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/tree/main/tutorials">Tutorials</a> page on GitHub for tutorials explaining how to use ZEN-norm to:
+* Normalise bigWigs with ZEN
+* Reverse prior bigWig normalisation
+* Compare and quanity normalisation method genome-wide alignment via Wasserstein distance
+* Create plots included in the publication
