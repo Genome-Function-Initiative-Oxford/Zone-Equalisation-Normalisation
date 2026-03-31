@@ -2162,4 +2162,8 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                         format = "pdf", bbox_inches = "tight")
 
         plt.show()
+<<<<<<< Updated upstream
         
+=======
+        
+>>>>>>> Stashed changes

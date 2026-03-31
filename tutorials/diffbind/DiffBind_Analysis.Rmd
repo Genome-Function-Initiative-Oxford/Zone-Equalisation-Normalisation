@@ -1,0 +1,213 @@
+---
+title: "DiffBind Analysis"
+output: html_notebook
+---
+
+# Imports
+
+```{r}
+# if (!require("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+
+# Load packages
+library(DiffBind)
+```
+
+# Sample Sheets
+Create sample sheets and comparison contrasts for erythroid ATAC-seq and erythroid RAD21 ChIP-seq
+
+## Erythroid ATAC-seq
+
+```{r}
+ery_atac_bam_dir <- "Example_Data/Erythroid_ATAC/BAMs"
+ery_atac_peak_dir <- ""
+
+# Erythroid ATAC-seq sample sheet
+ery_atac_samples <- data.frame(SampleID = c(paste0("Don002_ATAC_d13_rep", 1:7),
+                                            paste0("Don003_ATAC_d13_rep", 1:7)),
+                               Tissue = rep("CD34_erythroid", 14),
+                               Factor = c(rep("donor_2", 7), 
+                                          rep("donor_3", 7)),
+                               Condition = rep("healthy", 14),
+                               Treatment = rep("bulk", 14),
+                               Replicate = c(1:7, 1:7),
+                               bamReads = c(file.path(paste0(ery_atac_bam_dir, "Don002_ATAC_d13_rep", 1:7, ".bam")),
+                                            file.path(paste0(ery_atac_bam_dir, "Don003_ATAC_d13_rep", 1:7, ".bam"))),
+                               Peaks = c(file.path(ery_atac_peak_dir, paste0("Don002_ATAC_d13_rep", 1:7, ".bed")),
+                                         file.path(ery_atac_peak_dir, paste0("Don003_ATAC_d13_rep", 1:7, ".bed"))),
+                               PeakCaller = rep("bed", 14))
+
+# Set samples and contrast for donor 2 replicate comparison
+ery_don2_samples <- ery_atac_samples[(ery_atac_samples["Factor"] == "donor_2"),][1:6,]
+ery_don2_samples["Factor"] = c(rep("group_1", 3), rep("group_2", 3))
+ery_don2_contrast <- list(Factor = "group_1")
+
+# Set samples and contrast for donor 2 vs donor 3 replicate comparison
+ery_don2_vs_don3_samples <- ery_atac_samples[c(1,2,3,8,9,10),]
+ery_don2_vs_don3_contrast <- list(Factor = "donor_2")
+```
+
+## Erythroid RAD21 ChIP-seq
+
+```{r}
+ery_rad21_bam_dir <- "Example_Data/Erythroid_RAD21/BAMs"
+ery_rad21_peak_dir <- ""
+
+# Erythroid RAD21 ChIP-seq sample sheet
+ery_rad21_samples <- data.frame(SampleID = c(paste0("Don001_RAD21_d13_rep", 1:3),
+                                             paste0("Don002_RAD21_d13_rep", 1:3),
+                                             "Don030_RAD21_d13_rep_1",
+                                             "Don030_RAD21_d13_rep_3"),
+                                Tissue = rep("CD34_erythroid", 8),
+                                Factor = c(rep("donor_1", 3),
+                                           rep("donor_2", 3),
+                                           rep("donor_30", 2)),
+                                Condition = rep("healthy", 8),
+                                Treatment = rep("bulk", 8),
+                                Replicate = c(1:3, 1:3, 1, 3),
+                                bamReads = c(file.path(ery_rad21_bam_dir, paste0("Don001_RAD21_d13_rep", 1:3, ".bam")),
+                                             file.path(ery_rad21_bam_dir, paste0("Don002_RAD21_d13_rep", 1:3, ".bam")),
+                                             file.path(ery_rad21_bam_dir, "Don030_RAD21_d13_rep1.bam"),
+                                             file.path(ery_rad21_bam_dir, "Don030_RAD21_d13_rep3.bam")),
+                                Peaks = c(file.path(ery_rad21_peak_dir, paste0("Don001_RAD21_d13_rep", 1:3, ".bed")),
+                                          file.path(ery_rad21_peak_dir, paste0("Don002_RAD21_d13_rep", 1:3, ".bed")),
+                                          file.path(ery_rad21_peak_dir, paste0("Don030_RAD21_d13_rep1", ".bed")),
+                                          file.path(ery_rad21_peak_dir, paste0("Don030_RAD21_d13_rep3", ".bed"))),
+                            PeakCaller = rep("bed", 8))
+
+# Set the contrast
+contrast <- list(Factor = "donor_1")
+```
+
+# Extract LIB, RLE and TMM Scaling Factors
+
+Extract scaling factors to rescale bigWigs by full library size (LIB), RLE and TMM normalisation
+
+```{r}
+# Set sample sheets per dataset
+sample_sheets <- list("Erythroid_ATAC" = ery_atac_samples, "Erythroid_RAD21" = ery_rad21_samples)
+# Autosomal and sex chromosomes
+chromosomes <- c(paste0("chr", 1:22), "chrX", "chrY")
+# Normalisation methods to test
+norm_methods <- c(DBA_NORM_LIB, DBA_NORM_RLE, DBA_NORM_TMM)
+
+scaling_factors <- list()
+
+for (data in c("Erythroid_ATAC", "Erythroid_RAD21")) {
+  # Create DBA object
+  dba_object <- dba(sampleSheet = sample_sheets[[data]])
+  
+  # Find chromosomes to remove
+  peakset <- dba.peakset(dba_object, bRetrieve = TRUE)
+  greylist <- peakset[!(seqnames(peakset) %in% chromosomes)]
+  
+  # Apply ENCODE blacklist and keep only standard chromosomes
+  dba_object <- dba.blacklist(dba_object, blacklist = DBA_BLACKLIST_HG38, greylist = greylist)
+  
+  # Re-center peaks and count reads
+  dba_object <- dba.count(dba_object)
+  
+  # Normalise by each method
+  for (norm in norm_methods) {
+    dba_object <- dba.normalize(dba_object, normalize = norm)
+    # Extract the scaling factors
+    norm_info <- dba.normalize(dba_object, bRetrieve = TRUE)
+    scalers <- norm_info$norm.factors
+    names(scalers) <- dba_object$samples$SampleID
+    scaling_factors[[data]][[norm]] <- scalers
+  }
+}
+```
+```{r}
+# View scaling factors per dataset and normalisation method
+scaling_factors
+```
+
+# Differential Accessibility Analysis
+
+## ZEN Scaling Factors
+
+```{r}
+# Scaling factors per sample for ZEN normalisation
+ery_atac_zen <- c(Don002_ATAC_d13_rep1 = 0.2100296353671081,
+                  Don002_ATAC_d13_rep2 = 0.1795845107811403,
+                  Don002_ATAC_d13_rep3 = 0.10619528895735125,
+                  Don002_ATAC_d13_rep4 = 0.0713442611529159,
+                  Don002_ATAC_d13_rep5 = 0.12978024048757197,
+                  Don002_ATAC_d13_rep6 = 0.12575312989866483,
+                  Don002_ATAC_d13_rep7 = 0.10672348945554712,
+                  Don003_ATAC_d13_rep1 = 0.1978762445037181,
+                  Don003_ATAC_d13_rep2 = 0.17489888374729184,
+                  Don003_ATAC_d13_rep3 = 0.11213534059402934,
+                  Don003_ATAC_d13_rep4 = 0.07863437918851453,
+                  Don003_ATAC_d13_rep5 = 0.08186895342833504,
+                  Don003_ATAC_d13_rep6 = 0.09581304059400693,
+                  Don003_ATAC_d13_rep7 = 0.06246986948347924)
+```
+
+## Run DiffBind
+
+```{r}
+# Create DBA object
+dba_object <- dba(sampleSheet = ery_bulk_don2_samples)
+dba_object
+```
+
+```{r}
+# Clustering by peak calls
+dba.plotHeatmap(dba_object)
+```
+
+```{r}
+# Find chromosomes to remove
+chromosomes <- c(paste0("chr", 1:22), "chrX", "chrY")
+peakset <- dba.peakset(dba_object, bRetrieve = TRUE)
+greylist <- peakset[!(seqnames(peakset) %in% chromosomes)]
+
+# Apply ENCODE blacklist and keep only standard chromosomes
+dba_object <- dba.blacklist(dba_object, blacklist = DBA_BLACKLIST_HG38, greylist = greylist)
+
+# Re-center peaks and count reads
+dba_object <- dba.count(dba_object)
+dba_object
+```
+
+```{r}
+# DBA_NORM_LIB (default), DBA_NORM_RLE (DESeq2), DBA_NORM_TMM (edgeR) or custom vector (ZEN)
+dba_object <- dba.normalize(dba_object, normalize = DBA_NORM_RLE)
+norm_info <- dba.normalize(dba_object, bRetrieve = TRUE)
+# View the scaling factors
+norm_info
+```
+
+```{r}
+# Clustering by count scores
+plot(dba_object)
+```
+
+```{r}
+# Set the contrast
+dba_object <- dba.contrast(dba_object, reorderMeta = contrast)
+dba_object <- dba.analyze(dba_object)
+dba.show(dba_object, bContrasts = TRUE)
+```
+
+```{r}
+plot(dba_object, contrast = 1)
+```
+
+```{r}
+results <- dba.report(dba_object, contrast = 1)
+results
+```
+
+```{r}
+output_file <- "Erythroid_ATAC/DiffBind_Erythroid_Donor2_vs_Donor3_RLE.csv"
+
+results_df <- as(results, "data.frame")
+results_df <- results_df[c("seqnames", "start", "end", "Fold", "p-value", "FDR")]
+names(results_df)[names(results_df) == "seqnames"] <- "chrom"
+print(paste("Significant:", nrow(results_df[results_df$FDR < 0.05, ])))
+write.csv(results_df, output_file, row.names = FALSE)
+results_df
+```

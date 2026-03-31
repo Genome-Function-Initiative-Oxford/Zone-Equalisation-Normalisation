@@ -450,4 +450,8 @@ class ReverseNorm(ChromAnalysisExtended):
                     raise RuntimeError("runReversal failed to complete. To debug, see trace above.")
                 
             if self.verbose > 0:
+<<<<<<< Updated upstream
                 print("Finished saving bigWigs")
+=======
+                print("Finished saving bigWigs")
+>>>>>>> Stashed changes

@@ -12,7 +12,10 @@ authors = [
     "Operating System :: Unix",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
+<<<<<<< Updated upstream
     "Development Status :: 2 - Pre-Alpha",
+=======
+>>>>>>> Stashed changes
     "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: MIT License"
 ]
@@ -28,5 +31,9 @@ dependencies = [
 
 [project.urls]
 "Repository" = "https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation"
+<<<<<<< Updated upstream
 "Issues" = "https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/issues"
 "Issues" = "https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/issues"
+=======
+"Issues" = "https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/issues"
+>>>>>>> Stashed changes
