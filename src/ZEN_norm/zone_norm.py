@@ -6590,7 +6590,7 @@ class ZoneNorm(ChromAnalysisExtended):
         del plot_values
 
         if param_type is None:
-            param_type = self.param_type
+            param_type = self.zone_param_type
 
         elif param_type == "infer":
             best_zone_distribution = self.best_zone_distribution
