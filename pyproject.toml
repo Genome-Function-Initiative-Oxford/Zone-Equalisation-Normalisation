@@ -8,19 +8,14 @@ keywords = ["genomics", "genetics", "epigenetics", "bioinformatics", "biology", 
 authors = [
     {name = "Tom Wilson", email = "tw556@cantab.ac.uk"}
 ]
-@ -24,7 +24,7 @@ classifiers = [
+classifiers = [
     "Operating System :: Unix",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
-<<<<<<< Updated upstream
-    "Development Status :: 2 - Pre-Alpha",
-=======
->>>>>>> Stashed changes
     "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: MIT License"
 ]
 dependencies = [
-@ -35,10 +35,11 @@ dependencies = [
     "matplotlib>=3.10",
     "seaborn>=0.13",
     "sympy>=1.14",
@@ -31,9 +26,4 @@ dependencies = [
 
 [project.urls]
 "Repository" = "https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation"
-<<<<<<< Updated upstream
-"Issues" = "https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/issues"
 "Issues" = "https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/issues"
-=======
-"Issues" = "https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/issues"
->>>>>>> Stashed changes
