@@ -139,8 +139,9 @@ class ReverseNorm(ChromAnalysisExtended):
 
         if self.verbose > 0:
             n_chroms = len(chromosomes)
+            n_samples = len(self.sample_ids)
             print(f"Estimating fragment sizes from {n_chroms} chromosome{'s' if n_chroms != 1 else ''} "
-                  f"for {len(self.sample_ids)} samples")
+                  f"for {n_samples} sample{'s' if n_samples != 1 else ''}")
 
         # Check whether to read chromosomes into smaller chunks
         use_whole_chroms = (chunk_size == -1)
@@ -224,6 +225,120 @@ class ReverseNorm(ChromAnalysisExtended):
 
         return abs_frag_estimates, contain_floats
 
+    def calculateDivisors(self, chunk_size = 10000000, chromosomes = []):
+        """
+        Set divisors as the absolute fragment size estimates.
+
+        params:
+            chunk_size:  Set as a non-negative number to estimate the fragment size by breaking 
+                         the signal into chunks of this size, or as -1 to use whole chromosomes 
+                         in one go.
+            chromosomes: List of chromosome(s) to predict fragment size from.
+        """
+
+        calculate_frags = True
+
+        if (len(self.divisors) > 0) & (len(self.contain_floats) > 0):
+            # Check for all values to divide by per samples
+            if len(np.setdiff1d(list(self.divisors.keys()), self.sample_ids)) == 0:
+                # Check if each sample has been classified as containing integers or floats
+                if len(np.setdiff1d(list(self.contain_floats.keys()), self.sample_ids)) == 0:
+                    # Found expected values
+                    calculate_frags = False
+
+        if calculate_frags:
+            # Clear any previously set values
+            self.divisors = {}
+            self.contain_floats = {}
+            # Calculate the absolute fragment size estimates to use as divisors
+            self.divisors, self.contain_floats = self.estimateFragmentSizes(chunk_size, chromosomes)
+
+    def testNorm(self, chunk_size = 10000000, chromosomes = []):
+        """
+        Test and classify samples based on whether each was already normalised.
+        
+        params:
+            chunk_size:  Set as a non-negative number to estimate the fragment size by breaking 
+                         the signal into chunks of this size, or as -1 to use whole chromosomes 
+                         in one go.
+            chromosomes: List of chromosome(s) to predict fragment size from.
+
+        returns:
+            norm_status: Dictinary classifying samples into unnormalised, confirmed non-linear 
+                         normalised and linear / unconfirmed non-linear normalised
+        """
+
+        custom_sample_names = np.array(list(self.sample_names.values()))
+
+        # Set divisors as the absolute fragment size estimates
+        self.calculateDivisors(chunk_size, chromosomes)
+
+        # Classify samples as either unnormalised or normalised
+        raw_samples = []
+        non_linear_samples = []
+        norm_samples = []
+
+        for bw_idx in self.sample_ids:
+            # Get the sample specific divisor
+            div = self.divisors[bw_idx]
+            is_float = self.contain_floats[bw_idx]
+            sample_name = custom_sample_names[bw_idx]
+
+            if (div == 1) & (not is_float):
+                raw_samples.append(sample_name)
+
+            elif div == 1:
+                non_linear_samples.append(sample_name)
+
+            else:
+                norm_samples.append(sample_name)
+
+        # Classify samples into unnormalised, confirmed non-linear normalised and 
+        # linear / unconfirmed non-linear normalised
+        n_samples = len(custom_sample_names)
+        n_raw = len(raw_samples)
+        n_non_linear = len(non_linear_samples)
+        n_norm = len(norm_samples)
+
+        norm_status = {}
+
+        if n_raw > 0:
+            if self.verbose > 0:
+                if n_raw == n_samples:
+                    print("No samples were pre-normalised")
+                else:
+                    message = f"{n_raw} sample{'s' if n_raw != 1 else ''} are pre-normalised: "
+                    message += ", ".join(raw_samples)
+                    print(message)
+
+            norm_status["Unnormalised"] = raw_samples
+
+        if n_non_linear > 0:
+            if self.verbose > 0:
+                if n_non_linear == n_samples:
+                    print("All samples were transformed by a non-linear normalisation method")
+                else:
+                    message = f"{n_non_linear} sample{'s' if n_non_linear != 1 else ''} were "
+                    message += "transformed by a non-linear normalisation method: "
+                    message += ", ".join(non_linear_samples)
+                    print(message)
+
+            norm_status["Non_Linear"] = non_linear_samples
+
+        if n_norm > 0:
+            if self.verbose > 0:
+                if n_norm == n_samples:
+                    print("All samples were pre-normalised")
+                else:
+                    message = f"{n_norm} sample{'s' if n_norm != 1 else ''} were "
+                    message += "transformed by a normalisation method: "
+                    message += ", ".join(norm_samples)
+                    print(message)
+
+            norm_status["Normalised"] = norm_samples
+
+        return norm_status
+
     # Updated to reverse normalise the signal
     def openDefaultSignal(self, bw_idx, chromosome, signal_type = ""):
         """
@@ -249,7 +364,7 @@ class ReverseNorm(ChromAnalysisExtended):
         if np.any(np.abs(signal_unique - np.round(signal_unique)) > 0.1):
             sample_name = list(self.sample_names.values())[bw_idx]
             print(f"Warning: Floating point error was found within one decimal place for "
-                  f"{sample_name} {chromosome}.")
+                  f"{sample_name} {chromosome}")
 
         signal = np.round(signal)
 
@@ -270,37 +385,30 @@ class ReverseNorm(ChromAnalysisExtended):
         """
 
         custom_sample_names = np.array(list(self.sample_names.values()))
-        calculate_frags = True
 
-        # Find indexes of samples that have not yet been reverse normalised
-        incomplete_bw_idxs = self.findCurrentFiles(directories = [self.output_directories["bigwig"]],
-                                                   file_names_regex = "_reverse_norm.bw")
+        if replace_existing:
+            incomplete_bw_idxs = self.sample_ids
 
-        if len(incomplete_bw_idxs) == 0:
-            if self.verbose > 0:
-                print("Reverse normalised bigWigs already created for all samples")
-            
-            return None
+        else:
+            # Find indexes of samples that have not yet been reverse normalised
+            incomplete_bw_idxs = self.findCurrentFiles(directories = [self.output_directories["bigwig"]],
+                                                       file_names_regex = "_reverse_norm.bw",
+                                                       replace_existing = replace_existing)
 
-        if not replace_existing:
-            if (len(self.divisors) > 0) & (len(self.contain_floats) > 0):
-                # Check for all values to divide by per samples
-                if len(np.setdiff1d(list(self.divisors.keys()), self.sample_ids)) == 0:
-                    # Check if each sample has been classified as containing integers or floats
-                    if len(np.setdiff1d(list(self.contain_floats.keys()), self.sample_ids)) == 0:
-                        # Found expected values
-                        calculate_frags = False
+            if len(incomplete_bw_idxs) == 0:
+                if self.verbose > 0:
+                    print("Reverse normalised bigWigs already created for all samples")
+                
+                return None
 
-        if calculate_frags:
-            # Clear any previously set values
-            self.divisors = {}
-            self.contain_floats = {}
-            # Calculate the absolute fragment size estimates to use as divisors
-            self.divisors, self.contain_floats = self.estimateFragmentSizes(chunk_size, chromosomes)
+        # Set divisors as the absolute fragment size estimates
+        self.calculateDivisors(chunk_size, chromosomes)
 
         if self.n_cores > 1:
             processes = []
             executor = ProcessPoolExecutor(self.n_cores)
+
+        reversed_ids = []
 
         for bw_idx in incomplete_bw_idxs:
             # Get the sample specific divisor
@@ -310,17 +418,19 @@ class ReverseNorm(ChromAnalysisExtended):
 
             if (div == 1) & (not is_float):
                 if self.verbose > 0:
-                    print(f"{sample_name} has a divisor 1 and all values are integers so no need to "
-                          f"rescale bigWig")
+                    print(f"{sample_name} is not normalised as it has a fragment estimate of 1 and all "
+                          f"values are integers ")
 
             elif div == 1:
                 if self.verbose > 0:
-                    print(f"Cannot reverse {sample_name} normalisation at it has a divisor 1 and "
-                          f"contains non-integer values")
+                    # Sample has non-integer values, yet fragment estimate is 1
+                    print(f"Cannot reverse {sample_name} non-linear normalisation for {sample_name}")
 
             else:
                 if self.verbose > 0:
                     print(f"{sample_name} was pre-normalised and has a divisor of {round(div, 3)}")
+
+                reversed_ids.append(bw_idx)
 
                 if self.n_cores > 1:
                     processes.append(executor.submit(self.saveBigWig,
@@ -334,8 +444,10 @@ class ReverseNorm(ChromAnalysisExtended):
                                     file_name = f"{sample_name}_reverse_norm.bw",
                                     directory = self.output_directories["bigwig"])
                     
-        if self.n_cores > 1:
-            if self.checkParallelErrors(processes):
-                raise RuntimeError("runReversal failed to complete. To debug, see trace above.")
-
-        print("Finished saving bigWigs")
+        if len(reversed_ids) > 0:
+            if self.n_cores > 1:
+                if self.checkParallelErrors(processes):
+                    raise RuntimeError("runReversal failed to complete. To debug, see trace above.")
+                
+            if self.verbose > 0:
+                print("Finished saving bigWigs")
