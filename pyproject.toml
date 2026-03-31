@@ -1,40 +1,27 @@
-[build-system]
-requires = ["hatchling >= 1.26"]
-build-backend = "hatchling.build"
+@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ZEN-norm"
-version = "0.0.1"
+version = "1.0.0"
 description = "Zone Equalisation Normalisation: A Python package for bigWig scaling"
-keywords = ["genomics", "genetics", "bioinformatics", "bigwig", "normalisation", "atac-seq", "chip-seq", "tt-seq"]
+keywords = ["genomics", "genetics", "epigenetics", "bioinformatics", "biology", "bigwig", "normalisation",  "normalization", "atac-seq", "scatac", "chip-seq", "tt-seq"]
 authors = [
     {name = "Tom Wilson", email = "tw556@cantab.ac.uk"}
 ]
-license = {text = "MIT"}
-readme = "README.md"
-requires-python = ">=3.10"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Natural Language :: English",
-    "Operating System :: MacOS",
-    "Operating System :: POSIX",
+@ -24,7 +24,7 @@ classifiers = [
     "Operating System :: Unix",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: MIT License"
 ]
 dependencies = [
-    "numpy>=2.2",
-    "numba>=0.61",
-    "pandas>=2.3",
-    "pyBigWig==0.3.24",
+@ -35,10 +35,11 @@ dependencies = [
     "matplotlib>=3.10",
     "seaborn>=0.13",
     "sympy>=1.14",
+    "statsmodels>=0.14",
     "scipy>=1.15",
     "deeptools==3.5.6"
 ]
@@ -42,3 +29,4 @@ dependencies = [
 [project.urls]
 "Repository" = "https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation"
 "Issues" = "https://github.com/Genome-Function-Initiative-Oxford/ZEN-norm/issues"
+"Issues" = "https://github.com/Genome-Function-Initiative-Oxford/Zone-Equalisation-Normalisation/issues"
