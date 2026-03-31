@@ -10,10 +10,7 @@ from scipy import stats
 import statsmodels.formula.api as smf
 from matplotlib.colors import LinearSegmentedColormap
 from concurrent.futures import ProcessPoolExecutor, as_completed
-#from .chrom_analysis import ChromAnalysisCore
-
-os.chdir("/ceph/project/Wellcome_Discovery/towilson/Projects/ZEN-norm/PyPI/src/ZEN_norm/")
-from chrom_analysis import ChromAnalysisCore
+from .chrom_analysis import ChromAnalysisCore
 
 ##########################################
 # Main class for normalisation comparision
