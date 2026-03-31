@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 name = "ZEN-norm"
 version = "1.0.0"
 description = "Zone Equalisation Normalisation: A Python package for bigWig scaling"
-keywords = ["genomics", "genetics", "epigenetics", "bioinformatics", "biology", "bigwig", "normalisation",  "normalization", "atac-seq", "scatac", "chip-seq", "tt-seq"]
+keywords = ["zen", "zone", "genomics", "genetics", "epigenetics", "sequencing", "bioinformatics", "biology", "bigwig", "bw", "wig", "bam", "normalisation", "normalization", "scaling", "atac-seq", "scatac", "chip-seq", "tt-seq", "histones", "dna"]
 authors = [
     {name = "Tom Wilson", email = "tw556@cantab.ac.uk"}
 ]
