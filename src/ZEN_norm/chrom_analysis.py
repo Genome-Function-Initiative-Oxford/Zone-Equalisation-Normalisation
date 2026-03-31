@@ -244,12 +244,16 @@ class ChromAnalysisCore:
         for file, bam_path in zip(bam_names, bam_files):
             bai_path = f"{bam_path}.bai"
 
-            if os.path.getsize(bai_path) == 0:
-                if verbose > 0:
-                    print(f"Warning: Removing empty BAM index {bai_path}")
+            if os.path.exists(bai_path):
+                if os.path.getsize(bai_path) == 0:
+                    if verbose > 0:
+                        print(f"Warning: Removing empty BAM index {bai_path}")
 
-                # Remove empty file
-                os.remove(bai_path)
+                    # Remove empty file
+                    os.remove(bai_path)
+
+            elif verbose > 0:
+                print(f"Error occurred creating BAM index {bai_path.split(os.sep)[-1]}")
 
     @staticmethod
     def checkValidDirectory(directory):
