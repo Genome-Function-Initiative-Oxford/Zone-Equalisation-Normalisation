@@ -20,7 +20,7 @@ Create sample sheets and comparison contrasts for erythroid ATAC-seq and erythro
 
 ```{r}
 ery_atac_bam_dir <- "Example_Data/Erythroid_ATAC/BAMs"
-ery_atac_peak_dir <- ""
+ery_atac_peak_dir <- "Example_Data/Erythroid_ATAC/LanceOtron_Peaks"
 
 # Erythroid ATAC-seq sample sheet
 ery_atac_samples <- data.frame(SampleID = c(paste0("Don002_ATAC_d13_rep", 1:7),
@@ -51,7 +51,7 @@ ery_don2_vs_don3_contrast <- list(Factor = "donor_2")
 
 ```{r}
 ery_rad21_bam_dir <- "Example_Data/Erythroid_RAD21/BAMs"
-ery_rad21_peak_dir <- ""
+ery_rad21_peak_dir <- "Example_Data/Erythroid_RAD21/LanceOtron_Peaks"
 
 # Erythroid RAD21 ChIP-seq sample sheet
 ery_rad21_samples <- data.frame(SampleID = c(paste0("Don001_RAD21_d13_rep", 1:3),

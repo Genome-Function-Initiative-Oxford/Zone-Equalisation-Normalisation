@@ -1,4 +1,4 @@
-@ -4,9 +4,9 @@ build-backend = "hatchling.build"
+build-backend = "hatchling.build"
 
 [project]
 name = "ZEN-norm"
