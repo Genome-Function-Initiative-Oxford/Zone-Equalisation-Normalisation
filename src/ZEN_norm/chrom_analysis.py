@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import subprocess
 from seaborn import color_palette
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 #############################################################################################
 # Baseline classes for ZEN normalisation, reverse normalisation and normalisation comparision
@@ -27,7 +27,7 @@ class ChromAnalysisCore:
             n_cores:             The number of cores / CPUs to use if using multiprocessing.
             analysis_name:       Custom name of folder to save results to. By default this will
                                  be set to "Analysis".
-            verbose:             Set as an integer greater than 0 to display progress messages.
+            verbose:             Set as an integer > 0 to display progress messages.
         """
 
         # Initialise output directories
@@ -43,7 +43,8 @@ class ChromAnalysisCore:
         results_dir = os.path.join(self.analysis_name, "Results")
 
         self.output_directories = {"temp": temp_dir,
-                                   "results": results_dir}
+                                   "results": results_dir,
+                                   "plots": os.path.join(results_dir, "Plots")}
 
     def __str__(self):
         """ Format parameters in user readable way when print is called on an object """
@@ -96,15 +97,44 @@ class ChromAnalysisCore:
         return os.path.join(os.getcwd(), self.analysis_name)
 
     @staticmethod
-    def downloadFTP(ftp_paths, directory = None):
+    def fileDownload(file_path, ftp_path):
         """
-        Download BAM or bigWig files by FTP into a directory
+        Run wget to download a file.
 
         params:
-            directory: Directory to store files into
+            file_path: Path to save file to.
+            ftp_path:  URL of BAM or bigWig file to download.
         """
 
-        file_extensions = (".bam", ".bw", ".bigWig")
+        try:
+            subprocess.run(["wget", "--progress=bar:force:noscroll", "-O", file_path, ftp_path], 
+                           check = True)
+            return None
+        except subprocess.CalledProcessError as e:
+            return e
+
+    @staticmethod
+    def indexBAM(bam_file):
+        command = ["samtools", "index", str(bam_file)]
+
+        try:
+            subprocess.run(command, check = True)
+        except Exception as e:
+            print(f'Failed to create BAM index file for "{bam_file}" due to exception {e}')
+
+    @staticmethod
+    def downloadFTP(ftp_paths, directory = None, n_threads = 1, replace_existing = False, 
+                    verbose = 1):
+        """
+        Download BAM, bigWig or BED files by FTP into a directory.
+
+        params:
+            ftp_paths:        List of URLs of BAM or bigWig files to download.
+            directory:        Directory to store files into.
+            n_threads:        The number of threads to use if using multithreading.
+            replace_existing: Whether to overwrite previously created files.
+            verbose:          Set as an integer > 0 to display progress messages.
+        """
 
         if directory is None:
             # Use current directory
@@ -113,14 +143,113 @@ class ChromAnalysisCore:
             # Create directory to download bigWigs into
             os.makedirs(directory, exist_ok = True)
 
+        file_extensions = (".bam", ".bw", ".bigWig", ".bed")
+
+        if n_threads > 1:
+            executor = ThreadPoolExecutor(n_threads)
+
+        download_threads = []
+        bai_threads = []
+
+        # Record downloaded files and BAM files to create indexes for
+        downloaded_files = []
+        bam_files = []
+        bam_names = []
+
         for ftp_path in ftp_paths:
             # Get name of file to save contents to
-            file = os.path.join(directory, ftp_path.split(os.sep)[-1].replace("%2", "-").replace("%5F", "_"))
+            file = ftp_path.split(os.sep)[-1]
+            file = file.split("file=")[-1]
+            file = file.replace("%2E", ".").replace("%2", "-").replace("%5F", "_")
+            file_path = os.path.join(directory, file)
 
             # Check file has a valid extension
             if file.endswith(file_extensions):
+                if file.endswith("bam"):
+                    file_type = "BAM"
+                elif file.endswith("bed"):
+                    file_type = "BED"
+                else:
+                    file_type = "bigWig"
+
+                if not replace_existing:
+                    if os.path.exists(file_path):
+                        if os.path.getsize(file_path) > 0:
+                            if file_type == "BAM":
+                                # Check if the BAM index exists, and if not set to create it
+                                bai_path = f"{file_path}.bai"
+
+                                if not os.path.exists(bai_path):
+                                    bam_files.append(file_path)
+                                    bam_names.append(file)
+                                elif os.path.getsize(bai_path) == 0:
+                                    bam_files.append(file_path)
+                                    bam_names.append(file)
+
+                            # Skip download if the file already exists
+                            continue
+
+                if file_type == "BAM":
+                    bam_files.append(file_path)
+                    bam_names.append(file)
+
+                downloaded_files.append(file_path)
+
+                if verbose > 0:
+                    print(f"Downloading {file_type} {file}")
+
                 # Download the file
-                subprocess.run(["wget", "--progress=bar:force:noscroll", "-O", file, ftp_path], check = True)
+                if n_threads > 1:
+                    download_threads.append(executor.submit(ChromAnalysisCore.fileDownload,
+                                                            file_path = file_path,
+                                                            ftp_path = ftp_path))
+                else:
+                    ChromAnalysisCore.fileDownload(file_path, ftp_path)
+
+            elif verbose > 0:
+                print(f"Cannot download file {file} as it is not a BAM, bigWig or BED")
+
+        if download_threads:
+            for thread in as_completed(download_threads):
+                # Force threads to complete before continuing
+                e = thread.result()
+
+                if e is not None and verbose > 0:
+                    print(e)
+
+        for file_path in downloaded_files:
+            # Check if files downloaded successfully
+            if os.path.exists(file_path):
+                if os.path.getsize(file_path) == 0:
+                    if verbose > 0:
+                        print(f"Warning: Removing empty {file_type} {file_path}")
+
+                    # Remove empty file
+                    os.remove(file_path)
+                    continue
+
+                elif file_path in bam_files:
+                    # Create BAM indexes
+                    if n_threads > 1:
+                        bai_threads.append(executor.submit(ChromAnalysisCore.indexBAM,
+                                                           bam_file = file_path))
+                    else:
+                        ChromAnalysisCore.indexBAM(file_path)
+
+        if bai_threads:
+            for thread in as_completed(bai_threads):
+                # Force threads to complete before continuing
+                thread.result()
+
+        for file, bam_path in zip(bam_names, bam_files):
+            bai_path = f"{bam_path}.bai"
+
+            if os.path.getsize(bai_path) == 0:
+                if verbose > 0:
+                    print(f"Warning: Removing empty BAM index {bai_path}")
+
+                # Remove empty file
+                os.remove(bai_path)
 
     @staticmethod
     def checkValidDirectory(directory):
@@ -261,7 +390,7 @@ class ChromAnalysisCore:
             file_paths:     A list of paths to bigWig files of interest.
             directory:      The working directory containing the bigWig files of interest.
             min_files:      Throw an error if less files are found than this number.
-            verbose:        Set as > 0 to print messages for debugging.
+            verbose:        Set as an integer > 0 to display progress messages.
         """
 
         files = []
@@ -451,7 +580,7 @@ class ChromAnalysisCore:
             bw_idx:      Sample ID optionally given for printing.
             sample_name: Sample name optionally given for printing.
             return file: Set as True to return the bigwig file alongside the signal.
-            verbose:     Set as a number > 0 to print progress.
+            verbose:     Set as an integer > 0 to display progress messages.
         """
 
         if not os.path.exists(bigwig_file):
@@ -563,7 +692,7 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             n_cores:             The number of cores / CPUs to use if using multiprocessing.
             analysis_name:       Custom name of folder to save results to. By default this will be set 
                                  to "Analysis".
-            verbose:             Set as an integer greater than 0 to display progress messages.
+            verbose:             Set as an integer > 0 to display progress messages.
         """
 
         # Initialise the parent class
@@ -1159,14 +1288,14 @@ class ChromAnalysisExtended(ChromAnalysisCore):
         if not replace_existing:
             # Set files to match
             target_files = self.file_sample_names
-            # Ensure names are agnostic between dashes and underscores
-            target_files = [f.replace("-", "_") for f in target_files]
+            # Ensure names are agnostic between dashes, underscores and dots
+            target_files = [f.replace("-", "_").replace(".", "_") for f in target_files]
             # Set files to skip reading the signal for
             ignore_files = target_files.copy()
             
             for directory in current_files.keys():
                 # Check to see if any of the files already exist
-                check_files = [f.replace("-", "_") for f in current_files[directory]]
+                check_files = [f.replace("-", "_").replace(".", "_")  for f in current_files[directory]]
                 ignore_files = np.intersect1d(ignore_files, check_files)
 
             # Set files to create as those that could not be found
@@ -1452,12 +1581,12 @@ class ChromAnalysisExtended(ChromAnalysisCore):
         return range_regions
 
     def plotTracks(self, chromosome, start_coord, end_coord, signals = {}, 
-                   bar_regions = np.array([]), bar_label = "", y_intercept = None, y_intercept_label = "", 
-                   overlay_plots = False, plot_samples = np.array([]), main_title = "", 
-                   legend_title = None, custom_colours = np.array([]), y_intercept_colour = None, 
-                   bar_colour = "darkgrey", same_y_axis = True, custom_y = np.array([]), 
+                   bar_regions = [], bar_labels = [], y_intercept = None, y_intercept_labels = "", 
+                   overlay_plots = False, plot_samples = [], plot_bigwigs = [], plot_labels = [],
+                   main_title = "", legend_title = None, custom_colours = [], y_intercept_colour = None, 
+                   bar_colour = "darkgrey", same_y_axis = True, share_y_intercepts = True, custom_y = [], 
                    hide_multiple_x_axis = False, signal_transparency = 0.5, plot_width = 15, 
-                   plot_height = 0):
+                   plot_height = 0, pdf_name = ""):
         """ 
         Plot signal over a specified region for one or more samples.
         
@@ -1468,19 +1597,24 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             signals:              Whole chromosome signals can be provided manually by setting 
                                   this as a dictionary of names and signal arrays, or read 
                                   automatically if not set.
-            bar_regions:          List of arrays of coordinates of peaks / zones / regions to plot as bars at 
-                                  the top.
-            bar_label:            The name to add to the legend to identify the bar regions.
-            y_intercept:          Set as a number to plot a y-intercept (horizontal line).
-            y_intercept_label:    A string or list of names for y axis intercepts (if provided).
-            overlay_plots:        Set as True to plot sample signals on top of one another.
-            plot_samples:         Array of sample names to plot.
+            bar_regions:          List of arrays of coordinates of peaks / zones / regions to plot as 
+                                  bars at the top.
+            bar_labels:           Name to add to the legend to identify bar regions.
+            y_intercept:          Set as a number or list of numbers to plot y-intercepts (horizontal line).
+            y_intercept_labels:   A string or list of names for y axis intercepts (if provided).
+            overlay_plots:        Set as True to plot sample signals on top of one another, or False
+                                  for sub-plots.
+            plot_samples:         List of samples to plot if custom signals not given.
+            plot_bigwigs:         List of bigWigs to plot if custom signals and samples not given.
+            plot_labels:          List of custom names for samples.
             main_title:           Custom title to display above plot.
             legend_title:         Custom title for legend.
-            custom_colours:       List of colours to match to samples.
+            custom_colours:       List of colours to map to samples, or string to use same colour for 
+                                  all samples.
             bar_colour:           Colour of peak / zone / region bars (if bar_regions given).
             y_intercept_colour:   A string or list of colours for y axis intercepts (if provided).
             same_y_axis:          Whether to plot all samples with the same y-axis range.
+            share_y_intercepts:   Whether to plot all y-intercepts on every sub-plot.
             custom_y:             Optionally specify the y-axis range in format [first, last], 
                                   e.g. [0, 200].
             hide_multiple_x_axis: Set as True to only display the x-axis labels for the last sub-plot.
@@ -1488,7 +1622,10 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             plot_width:           Length of the plot.
             plot_height:          Can be used to manually set the height of the plot. 
                                   By default, this is determined by the number of sub-plots.
+            pdf_name:             To save plot to PDF, set this as a file name.
         """
+
+        custom_bigwigs = False
 
         if len(signals) == 0:
             custom_sample_names = []
@@ -1517,30 +1654,81 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                 # Check that samples to plot match samples
                 if len(np.setdiff1d(plot_samples, sample_names)) > 0:
                     # If avaliable, check custom sample names too
-                    if len(custom_sample_names) == 0 or len(np.setdiff1d(custom_sample_names, 
-                                                                         sample_names)) > 0:
+                    custom_names_set = len(custom_sample_names) != 0
+                    custom_names_set &= len(np.setdiff1d(custom_sample_names, plot_samples)) == 0
+                    
+                    if custom_names_set:
+                        if len(custom_sample_names) != len(sample_names):
+                            raise ValueError("Custom sample names must be unique")
+                        
+                        # Convert custom sample names to original names
+                        sample_name_map = {v: k for k, v in self.sample_names.items()}
+                        plot_signals = np.array([sample_name_map[s] for s in plot_samples])
+
+                    else:
                         raise Exception("Cannot find samples specified in plot_samples")
+
+            elif len(plot_bigwigs) > 0:
+                custom_bigwigs = True
+
+                if isinstance(plot_bigwigs, str):
+                    plot_bigwigs = np.array([])
+                else:
+                    plot_bigwigs = np.array(plot_bigwigs)
+
+                plot_signals = []
+
+                for file in plot_bigwigs:
+                    if not (file.endswith(".bw") or file.endswith(".bigWig")):
+                        raise ValueError(f'"{file}" is not a bigWig')
+                    elif not os.path.exists(file):
+                        raise ValueError(f'bigWig "{file}" does not exist')
+                    else:
+                        # Get sample name from file path
+                        name = file.split(os.sep)[-1].replace(".bw", "").replace(".bigwig", "")
+                        plot_signals.append(name)
+
+                if len(plot_labels) != len(plot_signals):
+                    plot_labels = plot_signals
+
+                plot_bw_idxs = np.arange(len(plot_bigwigs))
+                bigwig_row_map = dict(zip(plot_bigwigs, plot_bw_idxs))
+
             else:
                 # Default to plot all samples
                 plot_signals = sample_names
 
             # Remove potential duplicates
             plot_signals = np.unique(plot_signals)
-            # Convert to indexes to match samples to bigWigs
-            plot_bw_idxs = np.zeros(len(plot_signals), dtype = np.uint16)
-            missing_samples = []
 
-            for i, s in enumerate(plot_signals):
-                sample_idxs = np.where(np.atleast_1d(sample_names) == s)[0]
+            if len(plot_bigwigs) == 0:
+                custom_bigwigs = False
 
-                if len(sample_idxs) == 1:
-                    plot_bw_idxs[i] = sample_idxs[0]
-                else:
-                    missing_samples.append(s)
+                # Record bigWig paths of samples to plot
+                plot_bigwigs = []
+                # Convert to indexes to match samples to bigWigs
+                plot_bw_idxs = np.zeros(len(plot_signals), dtype = np.uint16)
+                missing_samples = []
 
-            if len(missing_samples) > 0:
-                raise ValueError(f"Unknown sample name{'s' if len(missing_samples) > 0 else ''}: "
-                                f"{chr(34)}{', '.join(chr(34) + s + chr(34) for s in missing_samples)}{chr(34)}")
+                for i, s in enumerate(plot_signals):
+                    sample_idxs = np.where(np.atleast_1d(sample_names) == s)[0]
+
+                    if len(sample_idxs) == 1:
+                        bw_idx = sample_idxs[0]
+                        plot_bw_idxs[i] = bw_idx
+                        plot_bigwigs.append(self.bigwig_paths[bw_idx])
+                    else:
+                        missing_samples.append(s)
+
+                if len(missing_samples) > 0:
+                    raise ValueError(f"Unknown sample name{'s' if len(missing_samples) != 1 else ''}: "
+                                    f"{', '.join(chr(34) + s + chr(34) for s in missing_samples)}")
+
+                if len(plot_labels) != len(plot_signals):
+                    if custom_sample_names:
+                        plot_labels = np.array(custom_sample_names)[plot_bw_idxs]
+                    else:
+                        plot_labels = np.array(sample_names)[plot_bw_idxs]
 
         elif not isinstance(signals, dict):
             raise ValueError("signals must be set as a dictionary of signal names and arrays, or "
@@ -1551,6 +1739,9 @@ class ChromAnalysisExtended(ChromAnalysisCore):
         else:
             # Derive signal names from signals dictionary
             plot_signals = list(signals.keys())
+
+            if len(plot_labels) != len(plot_signals):
+                plot_labels = plot_signals
         
         n_samples = len(plot_signals)
         plot_signal_idxs = np.arange(n_samples)
@@ -1582,8 +1773,20 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                 if (not same_y_axis) or (len(bar_regions) != n_samples):
                     raise ValueError("Number of bar regions and number of samples to plot does not match")
                 
-            if not isinstance(bar_label, str):
-                raise ValueError("bar_label must be set as a string")
+            if isinstance(bar_labels, str):
+                bar_labels = [bar_labels]
+            elif isinstance(bar_labels, (list, np.ndarray)):
+                bar_labels = list(bar_labels)
+                n_bar_labels = len(bar_labels)
+
+                if n_bar_labels != n_bar_regions:
+                    if n_bar_labels == 1:
+                        # Use the same label
+                        bar_labels = bar_labels * n_bar_regions
+                    else:
+                        raise ValueError("Number of bar labels and bar regions don't match")
+            else:
+                raise ValueError("bar_labels must be set as a string or a list")
 
         plot_y_intercept = True
         
@@ -1593,50 +1796,70 @@ class ChromAnalysisExtended(ChromAnalysisCore):
         elif isinstance(y_intercept, (list, np.ndarray)):
             # Plot multiple y-axis lines
             y_intercepts = np.array(y_intercept)
-        else: plot_y_intercept = False
+        else:
+            plot_y_intercept = False
         
         if plot_y_intercept:
-            y_intercept_labels = []
+            n_intercepts = len(y_intercepts)
             y_intercept_colours = []
             
-            if isinstance(y_intercept_label, str):
-                if (len(y_intercept_label) > 0) and (len(y_intercepts) == 1):
+            if isinstance(y_intercept_labels, str):
+                if (len(y_intercept_labels) > 0) and (n_intercepts == 1):
                     # Match single label to single y intercept value
-                    y_intercept_labels = np.array([y_intercept_label])
-
-            elif isinstance(y_intercept_label, (list, np.array)):
-                if len(y_intercept_label) != len(y_intercepts):
-                    raise ValueError(f"Could not match y intercepts to labels."
-                                     f"{len(y_intercepts)} y intercepts were given "
-                                     f"with {len(y_intercept_label)} labels.")
+                    y_intercept_labels = np.array([y_intercept_labels])
                 else:
-                    y_intercept_labels = np.array(y_intercept_label)
+                    y_intercept_labels = []
+
+            elif isinstance(y_intercept_labels, (list, np.array)):
+                if len(y_intercept_labels) != n_intercepts:
+                    raise ValueError(f"Could not match y intercepts to labels.\n"
+                                     f"{n_intercepts} y intercept{' was' if n_intercepts == 1 else 's were'}"
+                                     f" given with {len(y_intercept_labels)} labels.")
+                else:
+                    y_intercept_labels = np.array(y_intercept_labels)
 
             else:
-                raise ValueError("y_intercept_label must be either a string, list or array")
+                raise ValueError("y_intercept_labels must be either a string, list or array")
 
             if isinstance(y_intercept_colour, str):
-                if (len(y_intercepts) == 1) and (len(y_intercept_colour) > 0):
+                if (n_intercepts == 1) and (len(y_intercept_colour) > 0):
                     y_intercept_colours = np.array([y_intercept_colour])
                     
             elif isinstance(y_intercept_colour, (list, np.ndarray)):
-                if len(y_intercept_colour) != len(y_intercepts):
+                if len(y_intercept_colour) != n_intercepts:
                     raise ValueError(f"Could not match y intercept colours to labels."
-                                     f"{len(y_intercepts)} y intercepts were given "
+                                     f"{n_intercepts} y intercepts were given "
                                      f"with {len(y_intercept_colour)} colours.")
                 else:
                     y_intercept_colours = np.array(y_intercept_colour)
 
             elif y_intercept_colour is not None:
                 raise ValueError("y_intercept_colour must be either a string, list or array")
+            
+            if overlay_plots:
+                # Plot all y-axis intercepts onto the same sub-plot
+                share_y_intercepts = True
+            else:
+                share_y_intercepts = bool(share_y_intercepts)
+
+                if not share_y_intercepts:
+                    if n_intercepts != n_samples:
+                        raise ValueError(f"Cannot determine which y-intercept to match to which "
+                                         f"signal as the number of y-intercepts ({n_intercepts}) "
+                                         f"does not match the number of signals ({n_samples})")
 
         trace_colour_dict = {}
 
-        if len(custom_colours) == n_samples:
-            # Create dictionary mapping custom colours to samples to plot
+        if isinstance(custom_colours, str):
+            # Map same colour to samples
+            trace_colour_dict = dict(zip(plot_signals, [custom_colours] * len(plot_signals)))
+
+        elif len(custom_colours) == n_samples:
+            # Map custom colours to samples
             trace_colour_dict = dict(zip(plot_signals, custom_colours))
 
         elif len(custom_colours) > n_samples:
+             # Map custom colours to samples
              trace_colour_dict = dict(zip(plot_signals, custom_colours[:n_samples]))
 
         elif (len(custom_colours) > 0) and (self.verbose > 0):
@@ -1650,6 +1873,13 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             # Convert to dictionary mapping samples to plot with their colour
             trace_colour_dict = dict(zip(plot_signals, [trace_colours[i] for i in plot_signal_idxs]))
 
+        if pdf_name:
+            if not pdf_name.endswith(".pdf"):
+                pdf_name = pdf_name + ".pdf"
+
+            # Create directory to store plots
+            os.makedirs(self.output_directories["plots"], exist_ok = True)
+
         coords_diff = end_coord - start_coord
 
         # If signals not provided, read signal from file
@@ -1658,8 +1888,8 @@ class ChromAnalysisExtended(ChromAnalysisCore):
 
             if (len(plot_signals) == 1) or (self.n_cores == 1):
                 bw_idx = plot_bw_idxs[0]
-                signals[0] = self.extractChunkSignal(bw_idx = bw_idx,
-                                                     bigwig_file = self.bigwig_paths[bw_idx], 
+                signals[0] = self.extractChunkSignal(bw_idx = bw_idx if not custom_bigwigs else None,
+                                                     bigwig_file = plot_bigwigs[0], 
                                                      chromosome = chromosome,
                                                      start_idx = start_coord,
                                                      end_idx = end_coord,
@@ -1668,20 +1898,25 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             else:
                 with ProcessPoolExecutor(self.n_cores) as executor:
                     read_signal_processes = [executor.submit(self.extractChunkSignal,
-                                                             bw_idx = bw_idx,
-                                                             bigwig_file = self.bigwig_paths[bw_idx], 
+                                                             bw_idx = bw_idx if not custom_bigwigs else None,
+                                                             bigwig_file = plot_bigwigs[i], 
                                                              chromosome = chromosome,
                                                              start_idx = start_coord,
                                                              end_idx = end_coord,
                                                              pad_end = True,
-                                                             return_file = True) for bw_idx in plot_bw_idxs]
+                                                             return_file = True) for i, bw_idx in enumerate(plot_bw_idxs)]
                 
                     for process in as_completed(read_signal_processes):
                         # Get the signal and the file as an identifier
                         bigwig_file, signal = process.result()
+
                         # Convert file into signal index
-                        bw_idx = np.where(self.bigwig_paths == bigwig_file)[0][0]
-                        row_idx = np.where(plot_bw_idxs == bw_idx)[0][0]
+                        if custom_bigwigs:
+                            row_idx = bigwig_row_map[bigwig_file]
+                        else:
+                            bw_idx = np.where(self.bigwig_paths == bigwig_file)[0][0]
+                            row_idx = np.where(plot_bw_idxs == bw_idx)[0][0]
+
                         signals[row_idx] = signal
 
                     if self.checkParallelErrors(read_signal_processes):
@@ -1776,7 +2011,7 @@ class ChromAnalysisExtended(ChromAnalysisCore):
         last_row_idx = len(signals) - 1
 
         # Iterate through samples
-        for signal_name, row_idx in zip(plot_signals, plot_signal_idxs):
+        for signal_name, label, row_idx in zip(plot_signals, plot_labels, plot_signal_idxs):
             row_signal = signals[row_idx]
             row_min_y = round(math.floor(min(row_signal) / 5)) * 5
             row_max_y = round(math.ceil(max(row_signal) / 5)) * 5
@@ -1803,7 +2038,7 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                                          row_signal,
                                          where = row_signal < 0,
                                          color = trace_colour_dict[signal_name],
-                                         label = signal_name,
+                                         label = label,
                                          alpha = signal_transparency)
                 if row_max_y > 0:
                     # Fill area below line
@@ -1811,11 +2046,11 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                                          row_signal,
                                          where = row_signal > 0,
                                          color = trace_colour_dict[signal_name],
-                                         label = signal_name,
+                                         label = label,
                                          alpha = signal_transparency)
                     
             except Exception as e:
-                print(f"Error: Could not plot filled area under curve for sample {signal_name}")
+                print(f"Error: Could not plot filled area under curve for sample {label}")
                 print(e)
 
             if (len(custom_y) != 2) and (not same_y_axis) and (not overlay_plots):
@@ -1824,7 +2059,7 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                 max_y = row_max_y
 
                 if (self.verbose > 0) and (max_y == 0) and (min_y == 0):
-                    print(f"Warning: the signal for {signal_name} was zero for the region")
+                    print(f"Warning: the signal for {label} was zero for the region")
                 elif min_y > 0:
                     min_y = 0
                 elif max_y < 0:
@@ -1857,6 +2092,8 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                     bar_boundary_height = max_y / 20
 
                 if bar_region_coords.shape[0] > 0:
+                    bar_label = bar_labels[row_idx]
+                    
                     # Iterate over bar regions for the sample
                     for coords in bar_region_coords:
                         bar_region_x = coords[0]
@@ -1888,24 +2125,41 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                 label = ""
                 colour = None
                 
-                for y_idx in range(len(y_intercepts)):
-                    y = y_intercepts[y_idx]
-                    
-                    if isinstance(y_intercept_labels, np.ndarray):
-                        label = y_intercept_labels[y_idx]
-                    if len(y_intercept_colours) > 0:
-                        colour = y_intercept_colours[y_idx]
+                if share_y_intercepts:
+                    # Plot all y-axis intercept lines
+                    for y_idx in range(n_intercepts):
+                        y = y_intercepts[y_idx]
+                        
+                        if isinstance(y_intercept_labels, np.ndarray):
+                            label = y_intercept_labels[y_idx]
+                        if len(y_intercept_colours) > 0:
+                            colour = y_intercept_colours[y_idx]
 
-                    # Add y axis intercept line
+                        plot_ax.axhline(y = y, color = colour, linestyle = "--", label = label)
+                else:
+                    # Plot one y-axis intercept line
+                    y = y_intercepts[row_idx]
+
+                    if isinstance(y_intercept_labels, np.ndarray):
+                        label = y_intercept_labels[row_idx]
+                    if len(y_intercept_colours) > 0:
+                        colour = y_intercept_colours[row_idx]
+
                     plot_ax.axhline(y = y, color = colour, linestyle = "--", label = label)
 
-            plot_ax.legend(title = legend_title)
+            plot_ax.legend(title = legend_title, loc = "upper right")
             plot_ax.ticklabel_format(style = "plain", useOffset = False)
 
         if len(main_title) > 0:
             # Set a main title above the subplots
             fig.suptitle(main_title, fontweight = "bold")
 
-        # Disable scientific notation and display plot
+        # Disable scientific notation
         plt.ticklabel_format(style = "plain", useOffset = False)
+
+        if pdf_name:
+            plt.savefig(os.path.join(self.output_directories["plots"], pdf_name), 
+                        format = "pdf", bbox_inches = "tight")
+
         plt.show()
+        
