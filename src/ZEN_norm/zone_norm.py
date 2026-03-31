@@ -2978,6 +2978,13 @@ class ZoneNorm(ChromAnalysisExtended):
                 process_chrom_bws.append((chrom, bw_idx))
 
         if len(process_chrom_bws) > 0:
+            combined_dist_stats_file = os.path.join(self.output_directories["output_stats"], 
+                                                    "combined-distribution-stats.csv")
+                                                    
+            if os.path.exists(combined_dist_stats_file):
+                # Delete pre-existing distribution statistics
+                os.remove(combined_dist_stats_file)
+                
             # Update attributes if different parameters given
             if downsample_size is None:
                 downsample_size = self.downsample_size
