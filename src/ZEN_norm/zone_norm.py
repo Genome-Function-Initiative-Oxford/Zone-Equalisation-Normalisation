@@ -3013,6 +3013,10 @@ class ZoneNorm(ChromAnalysisExtended):
                         dist_stats_file = os.path.join(self.output_directories["dist_stats"], chrom,
                                                        f"distribution-stats_{file_sample_name}.csv.gz")
                         
+                        if os.path.exists(dist_stats_file):
+                            # Delete to overwrite file
+                            os.remove(dist_stats_file)
+
                         # Run process
                         test_processes.append(executor.submit(self.testZoneCallDistributions,
                                                               bw_idx = bw_idx,
@@ -3034,6 +3038,11 @@ class ZoneNorm(ChromAnalysisExtended):
                                                      f"signal-stats_{file_sample_name}.csv.gz")
                     dist_stats_file = os.path.join(self.output_directories["dist_stats"], chrom,
                                                    f"distribution-stats_{file_sample_name}.csv.gz")
+                    
+                    if os.path.exists(dist_stats_file):
+                        # Delete to overwrite file
+                        os.remove(dist_stats_file)
+
                     self.testZoneCallDistributions(bw_idx = bw_idx,
                                                    chromosome = chrom,
                                                    log_transform = log_transform,
@@ -3293,6 +3302,9 @@ class ZoneNorm(ChromAnalysisExtended):
             if os.path.exists(dist_stats_file):
                 # Delete to overwrite file
                 os.remove(dist_stats_file)
+                
+        else:
+            save_to_file = False
 
         # Test if smoothing was applied
         if self.kernel is not None:
@@ -3740,8 +3752,8 @@ class ZoneNorm(ChromAnalysisExtended):
 
         if dist_name is None:
             dist_name = self.zone_distribution
-        elif dist_name not in self.test_distributions:
-            raise ValueError(f"Distribution {dist_name} was not found in test_distributions")
+        elif dist_name not in self.getSupportedDistributions():
+            raise ValueError(f'Distribution "{dist_name}" is not a supported distribution')
         
         if zone_probability is None:
             # Use the set threshold
@@ -3860,8 +3872,8 @@ class ZoneNorm(ChromAnalysisExtended):
                                and scale.
         """
         
-        if dist_name not in self.test_distributions:
-            raise ValueError(f"Distribution {dist_name} was not found in test_distributions")
+        if dist_name not in self.getSupportedDistributions():
+            raise ValueError(f'Distribution "{dist_name}" is not a supported distribution')
 
         if (location == None) and (scale == None):
             if (bw_idx != None) and (chromosome != None):
@@ -6211,16 +6223,18 @@ class ZoneNorm(ChromAnalysisExtended):
             calculate_stats:    Whether to include dictionary of signal statistics in output.
         """
 
+        # Get the name of the sample according to its ID
+        custom_sample_name = self.getSampleNames(return_custom = True)[bw_idx]
+        file_sample_name = self.file_sample_names[bw_idx]
+
         # Open the fitted distribution statistics
         dist_stats_file = os.path.join(self.output_directories["dist_stats"],
                                        chromosome,
-                                       f"distribution-stats_{self.file_sample_names[bw_idx]}.gz")
+                                       f"distribution-stats_{file_sample_name}.csv.gz")
 
         if not os.path.isfile(dist_stats_file):
-            # Create combined distribution statistics if does not yet exist
-            dist_stats_df = self.combineStats(stats_type = "distribution",
-                                              file_name = dist_stats_file,
-                                              return_df = True)
+            raise FileNotFoundError(f"Distribution statistics are missing for {custom_sample_name}.\n"
+                                    f"Run testDistributions to calculate distribution statistics.")
         else:
              # Read from file
             dist_stats_df = pd.read_csv(dist_stats_file)
