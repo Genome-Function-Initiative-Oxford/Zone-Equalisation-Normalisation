@@ -1,3 +1,7 @@
+Unreleased TomMakesThings
+	Version 1.0.1
+	* Updated bigWig merging function to separate positive and negative signal
+
 31/03/2026 TomMakesThings
 	Version 1.0.0
 	* Minor bug fixes
