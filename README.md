@@ -34,7 +34,13 @@ ZEN-norm is designed to run on Python 3.10 and above. It is installable from eit
 conda install tommakesthings::zen-norm
 ```
 
-  If there are issues installing ZEN-norm, a conda environment with the required packages can be created with the <code>zen_environment.yml</code> file.
+  If there are issues installing ZEN-norm, an alternative is:
+
+```
+conda install -c https://conda.anaconda.org/TomMakesThings zen-norm
+```
+  
+  Or a conda environment with the required packages can be created with the <code>zen_environment.yml</code> file.
 
   ```
   conda env create --name zen_env --file=environment/zen_environment.yml
