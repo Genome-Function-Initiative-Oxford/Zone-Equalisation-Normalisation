@@ -1,6 +1,7 @@
 Unreleased TomMakesThings
 	Version 1.0.1
-	* Major bux fixes in predictSignalZones to prevent error when no zones found for a chromosome and selecting zone threshold with one core
+	* Major bug fixes in predictSignalZones to prevent error when no zones found for a chromosome and selecting zone threshold with one core
+	* Minor bug fix in mergeOverlapZones for extending zone coordinates in case with multiple extension sizes 
 	* Updated bigWig merging function to separate positive and negative signal
 	* Prevent samtools error if not installed, but spike-in not set
 
