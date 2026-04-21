@@ -4,6 +4,7 @@ Unreleased TomMakesThings
 	* Minor bug fix in mergeOverlapZones for extending zone coordinates in case with multiple extension sizes 
 	* Updated bigWig merging function to separate positive and negative signal
 	* Prevent samtools error if not installed, but spike-in not set
+	* Blacklisted regions now hidden in ZEN normalised bigWigs
 
 31/03/2026 TomMakesThings
 	Version 1.0.0
