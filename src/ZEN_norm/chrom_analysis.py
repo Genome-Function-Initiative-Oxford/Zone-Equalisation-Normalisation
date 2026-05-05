@@ -819,20 +819,34 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             # Derive sample names from BAM files
             full_sample_names = []
             missing_bam_indexes = []
+            # Validate BAM paths
+            valid_bam_paths = []
 
             for path in self.bam_paths:
+                if not path.endswith(".bam"):
+                    continue
+
                 # Extract sample name from file path
-                path = path.split(os.sep)
-                sample_name = path[-1].replace(".bam", "")
+                split_path = path.split(os.sep)
+                sample_name = split_path[-1].replace(".bai", "").replace(".csi", "").replace(".bam", "")
+
                 full_sample_names.append(sample_name)
+                valid_bam_paths.append(path)
+
                 # Check for BAM index
-                bam_index_path = os.path.join(os.sep.join(path[:-1]), f"{sample_name}.bam.bai")
+                bam_index_path = os.path.join(os.sep.join(split_path[:-1]), f"{sample_name}.bam.bai")
 
                 if not os.path.exists(bam_index_path):
-                    missing_bam_indexes.append(sample_name)
+                    # Check for alternative index
+                    bam_index_path = os.path.join(os.sep.join(split_path[:-1]), f"{sample_name}.bam.csi")
+
+                    if not os.path.exists(bam_index_path):
+                        missing_bam_indexes.append(sample_name)
             
             if missing_bam_indexes:
                 raise ValueError(f"BAM indexes missing for: {', '.join(missing_bam_indexes)}")
+            
+            self.bam_paths = np.array(valid_bam_paths)
 
         else:
             # Find all values in file path with a wig or bigWig extension
@@ -2209,4 +2223,3 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                         format = "pdf", bbox_inches = "tight")
 
         plt.show()
-        
