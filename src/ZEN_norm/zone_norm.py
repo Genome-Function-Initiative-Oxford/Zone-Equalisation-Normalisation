@@ -55,17 +55,17 @@ class ZoneNorm(ChromAnalysisExtended):
     # Map compression method names to file extensions
     compress_extensions = {"gzip": ".gz", "xz": ".xz"}
 
-    __slots__ = ("chrom_sizes_file", "interleave_sizes", "norm_method", "genome_size", "extend_reads", 
-                 "filter_strand", "exclude_zero", "spikein_prefix", "spikein_reads", "zone_remove_percent", 
-                 "zen_from_zones", "zen_padded_zones", "zen_sample_zones", "norm_power", "scaling_factors", 
-                 "scalar_name", "deletion_size", "downsample_size", "downsample_seed", "kernel", 
-                 "test_distributions", "log_transform", "zone_distribution", "zone_param_type", 
+    __slots__ = ("chrom_sizes_file", "interleave_sizes", "mask_blacklisted", "norm_method", "genome_size", 
+                 "extend_reads", "filter_strand", "exclude_zero", "spikein_prefix", "spikein_reads", 
+                 "zone_remove_percent", "zen_from_zones", "zen_padded_zones", "zen_sample_zones", "norm_power", 
+                 "scaling_factors", "scalar_name", "deletion_size", "downsample_size", "downsample_seed", 
+                 "kernel", "test_distributions", "log_transform", "zone_distribution", "zone_param_type", 
                  "best_zone_distribution", "zone_probability", "pad_bin_size", "extend_n_bins", "merge_depth", 
                  "min_region_bps", "quality_filter", "min_different_bps")
     def __init__(self, bam_paths = [], bigwig_paths = [], chromosomes = [], chrom_sizes_file = None, 
-                 interleave_sizes = True, sample_names = [], blacklist = "", norm_method = "ZEN", 
-                 genome_size = None, extend_reads = False, filter_strand = False, spikein_prefix = "",
-                 exclude_zero = True, zone_remove_percent = 10, zen_from_zones = True, 
+                 interleave_sizes = True, sample_names = [], blacklist = "", mask_blacklisted = True, 
+                 norm_method = "ZEN", genome_size = None, extend_reads = False, filter_strand = False, 
+                 spikein_prefix = "", exclude_zero = True, zone_remove_percent = 10, zen_from_zones = True, 
                  zen_padded_zones = True, zen_sample_zones = True, scaling_factors = {}, 
                  scalar_name = "Scalar", norm_power = None, deletion_size = 500, downsample_size = 300,
                  downsample_seed = 0, kernel = [], test_distributions = ["laplace"], log_transform = True, 
@@ -94,6 +94,8 @@ class ZoneNorm(ChromAnalysisExtended):
                                  e.g. accessing sample_names would return 
                                  {"cntrl_s1": "Control Sample", "flt3_inhibitor_s1": "Treated Sample"}.
             blacklist:           File path to blacklist file with chromosome coordinates to exclude.
+            mask_blacklisted:    Whether to mask blacklisted regions with zeros when saving normalised 
+                                 signal to bigWig.
             norm_method:         Signal Normalisation method to apply, i.e. "ZEN", "Scalar", "Power",
                                  "Log", "No normalisation" (bigWig/BAM) or "RPKM", "CPM", "BPM", "RPGC", 
                                  "RRPM" (BAM).
@@ -215,6 +217,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                    "plots": os.path.join(results_dir, "Plots")}
 
         self.setInterleaveSizes(interleave_sizes)
+        self.setMaskBlacklisted(mask_blacklisted)
         self.setGenomeSize(genome_size)
         self.setExtendReads(extend_reads)
         self.setFilterStrand(filter_strand)
@@ -320,6 +323,12 @@ class ZoneNorm(ChromAnalysisExtended):
         except:
             raise ValueError("interleave_sizes must be set as either True or False")
 
+    def setMaskBlacklisted(self, mask_blacklisted):
+        try:
+            self.mask_blacklisted = bool(mask_blacklisted)
+        except:
+            raise ValueError("mask_blacklisted must be set as either True or False")
+
     def setGenomeSize(self, genome_size):
         if not (genome_size is None):
             if isinstance(genome_size, str):
@@ -370,13 +379,13 @@ class ZoneNorm(ChromAnalysisExtended):
             spikein_prefix: Chromosome name prefix of spike-in.
         """
 
-        if shutil.which("samtools") is None:
-            raise ImportError("samtools is required to use spike-in and needs to be installed")
-
         if not isinstance(spikein_prefix, str) or not spikein_prefix:
             self.spikein_prefix = None
             self.spikein_reads = {}
             return None
+
+        if shutil.which("samtools") is None:
+            raise ImportError("samtools is required to use spike-in and needs to be installed")
 
         if len(self.bam_paths) == 0:
             raise ValueError("BAMs must be given if using spike-in")
@@ -1330,10 +1339,13 @@ class ZoneNorm(ChromAnalysisExtended):
 
         blacklist_df = pd.read_csv(blacklist_file, sep = "\t", header = None, 
                                    names = ["chrom", "start", "end", "class"])
+        blacklist_df = blacklist_df.sort_values(by = ["chrom", "start"])
 
         if chromosome is not None:
             # Subset regions
             blacklist_df = blacklist_df.loc[blacklist_df["chrom"] == chromosome]
+
+        blacklist_df.sort_values(by = "start")
 
         return blacklist_df
 
@@ -1640,6 +1652,14 @@ class ZoneNorm(ChromAnalysisExtended):
                                    end_idx = -1,
                                    chromosome = chromosome,
                                    pad_end = True)
+
+        if self.blacklist is not None:
+            blacklist_coords = np.array(self.getBlacklist(chromosome = chromosome)[["start", "end"]])
+                
+            if len(blacklist_coords) > 0:
+                # Mask blacklisted regions
+                for start, end in blacklist_coords:
+                    signal[start:end] = 0
         
         return signal
 
@@ -1908,8 +1928,7 @@ class ZoneNorm(ChromAnalysisExtended):
     def getSampleZoneSignal(self, sample_name, chromosome, zones, signal_type = "normalised", exclude_zero = False, 
                             zone_remove_percent = 0, return_bw_idx = False):
         """
-        Given a sample and zone coordinates over a chromosome, create an array with the signal over the zones 
-        concatenated.
+        Given a sample and zone coordinates over a chromosome, create an array of concatenated signal over zones.
 
         params:
             sample_name:         Name of sample to get signal across zones for.
@@ -1928,9 +1947,11 @@ class ZoneNorm(ChromAnalysisExtended):
 
         # Set which kind of signal to read
         signal_type = str(signal_type).lower()
+        read_normalised = False
 
         if signal_type[0] == "n" and self.norm_method != "No normalisation":
             signal_type = "normalised"
+            read_normalised = True
         elif signal_type[0] == "s":
             signal_type = "smooth"
             # Open smoothed signal across the chromosome
@@ -1962,6 +1983,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                                start_idx = start_coord,
                                                end_idx = end_coord,
                                                chromosome = chromosome,
+                                               read_normalised = read_normalised,
                                                verbose = 0)
                     zone_signal[start_idx:(start_idx + len(signal))] = signal
                     
@@ -1970,7 +1992,7 @@ class ZoneNorm(ChromAnalysisExtended):
 
             if exclude_zero:
                 # Remove zeros so they do not contribute to calculating statistics
-                zone_signal = zone_signal[np.where(zone_signal != 0)]
+                zone_signal = zone_signal[zone_signal != 0]
 
             if zone_remove_percent > 0:
                 # Remove the lower and upper nth percentile
@@ -2014,6 +2036,7 @@ class ZoneNorm(ChromAnalysisExtended):
 
         if len(sample_names) == 0:
             sample_ids = self.sample_ids
+            sample_names = self.getSampleNames(return_custom = True)
         else:
             sample_ids = [self.sampleToIndex(s) for s in sample_names]
 
@@ -2021,18 +2044,22 @@ class ZoneNorm(ChromAnalysisExtended):
         if use_padded:
             if hasattr(self, "bin_size"):
                 if not isinstance(extend_depth, (int, np.integer)):
+                    extend_pad = self.extend_n_bins * self.pad_bin_size
+
                     if self.pad_bin_size != self.bin_size:
-                        extend_pad = self.extend_n_bins * self.pad_bin_size
                         extend_bin = self.extend_n_bins * self.bin_size
 
                         raise ValueError(f"As {type(self).__name__} was set to produce multiple types "
                                          f"of padded zones, extend_depth must be set as an integer, "
                                          f"e.g. {extend_pad} or {extend_bin}")
+                    else:
+                        extend_depth = extend_pad
                 
             elif extend_depth is None:
                 extend_depth = self.extend_n_bins * self.pad_bin_size
 
-            merged_zones = self.getMergedZones(chromosome, get_unpadded = False, 
+            merged_zones = self.getMergedZones(chromosome,
+                                               get_unpadded = False, 
                                                extend_depth = extend_depth,
                                                return_df = False)[f"padded_{extend_depth}"]
         else:
@@ -2057,23 +2084,39 @@ class ZoneNorm(ChromAnalysisExtended):
 
         signal_processes = []
 
-        with ProcessPoolExecutor(self.n_cores) as executor:
+        if self.n_cores > 1:
+            with ProcessPoolExecutor(self.n_cores) as executor:
+                for sample_name in sample_names:
+                    signal_processes.append(executor.submit(self.getSampleZoneSignal,
+                                                            sample_name = sample_name,
+                                                            chromosome = chromosome,
+                                                            zones = merged_zones,
+                                                            signal_type = signal_type,
+                                                            exclude_zero = False, 
+                                                            zone_remove_percent = 0,
+                                                            return_bw_idx = True))
+                                
+                for process in as_completed(signal_processes):
+                    sample_id, signal = process.result()
+                    row_idx = np.where(sample_id == sample_ids)[0][0]
+
+                    for i, zone in enumerate(merged_zones):
+                        # Assign signal for the sample at each zone
+                        zone_signals[(zone[0], zone[1])][row_idx] = signal[zone_idxs[i]:zone_idxs[i+1]]
+        else:
             for sample_name in sample_names:
-                signal_processes.append(executor.submit(self.getSampleZoneSignal,
-                                                        sample_name = sample_name,
-                                                        chromosome = chromosome,
-                                                        zones = merged_zones,
-                                                        signal_type = signal_type,
-                                                        exclude_zero = False, 
-                                                        zone_remove_percent = 0,
-                                                        return_bw_idx = True))
-                            
-            for process in as_completed(signal_processes):
-                sample_id, signal = process.result()
+                sample_id, signal = self.getSampleZoneSignal(sample_name = sample_name,
+                                                             chromosome = chromosome,
+                                                             zones = merged_zones,
+                                                             signal_type = signal_type,
+                                                             exclude_zero = False, 
+                                                             zone_remove_percent = 0,
+                                                             return_bw_idx = True)
+                row_idx = np.where(sample_id == sample_ids)[0][0]
 
                 for i, zone in enumerate(merged_zones):
                     # Assign signal for the sample at each zone
-                    zone_signals[(zone[0], zone[1])][sample_id] = signal[zone_idxs[i]:zone_idxs[i+1]]
+                    zone_signals[(zone[0], zone[1])][row_idx] = signal[zone_idxs[i]:zone_idxs[i+1]]
 
         return zone_signals
 
@@ -2463,7 +2506,7 @@ class ZoneNorm(ChromAnalysisExtended):
         """
 
         if len(directories) == 0:
-            raise ValueError("Directories cannot be empty")
+            raise FileNotFoundError("Directories cannot be empty")
 
         # Check to see if all directories have already been created
         directories_exist = np.array([os.path.exists(dir) for dir in directories])
@@ -2490,6 +2533,7 @@ class ZoneNorm(ChromAnalysisExtended):
                     # In the case where the directory exists but should not be cleared, record any 
                     # pre-existing files and attempt to match these with the expected files to create
                     found_files = glob.glob(os.path.join(directory, ("*")))
+
                     # Extract the unique sample name(s) from the files,
                     # e.g. 'Donor1' from 'signals_Donor1.npy.gz' or 
                     # 'Donor1_vs_Donor2' from 'signals_Donor1_vs_Donor2.npy.gz'
@@ -2746,7 +2790,7 @@ class ZoneNorm(ChromAnalysisExtended):
                     data = self.loadCompressed(file_name = sample_file, 
                                                compression = compression)
             else:
-                raise ValueError(f'File "{sample_file}" is empty')
+                raise FileNotFoundError(f'File "{sample_file}" is empty')
         else:
             raise FileNotFoundError(f"Cannot find file {sample_file}")
 
@@ -3038,7 +3082,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                                      f"signal-stats_{file_sample_name}.csv.gz")
                     dist_stats_file = os.path.join(self.output_directories["dist_stats"], chrom,
                                                    f"distribution-stats_{file_sample_name}.csv.gz")
-                    
+
                     if os.path.exists(dist_stats_file):
                         # Delete to overwrite file
                         os.remove(dist_stats_file)
@@ -3302,7 +3346,7 @@ class ZoneNorm(ChromAnalysisExtended):
             if os.path.exists(dist_stats_file):
                 # Delete to overwrite file
                 os.remove(dist_stats_file)
-                
+
         else:
             save_to_file = False
 
@@ -3320,6 +3364,7 @@ class ZoneNorm(ChromAnalysisExtended):
 
         else:
             smoothed = False
+
             try:
                 # Open full signal prior to normalisation
                 signal = self.signalReader(bw_idx = bw_idx,
@@ -3328,6 +3373,19 @@ class ZoneNorm(ChromAnalysisExtended):
                                            chromosome = chromosome,
                                            pad_end = True,
                                            verbose = self.verbose)
+
+                if self.blacklist is not None:
+                    blacklist_coords = np.array(self.getBlacklist(chromosome = chromosome)[["start", "end"]])
+                    
+                    if len(blacklist_coords) > 0:
+                        # Remove blacklisted regions
+                        keep_mask = np.ones(len(signal), dtype = bool)
+
+                        for start, end in blacklist_coords:
+                            keep_mask[start:end] = False
+
+                        signal = signal[keep_mask]
+
             except:
                 # If signal is missing, analysis may not have been run on the sample's chromosome
                 raise ValueError(f"Could not read signal for {chromosome} {sample_name} due to "
@@ -3857,7 +3915,7 @@ class ZoneNorm(ChromAnalysisExtended):
     def reverseZoneThreshold(self, dist_name, zone_threshold, location = None, scale = None, 
                              bw_idx = None, chromosome = None, param_type = None,):
         """
-        Convert a zone threshold back to a probability.
+        Convert a zone threshold back to a probability using the cumulative distribution function.
 
         params:
             dist_name:         Name of the fitted distribution, e.g. "Norm".
@@ -4035,6 +4093,14 @@ class ZoneNorm(ChromAnalysisExtended):
                                        pad_end = True,
                                        verbose = 0)
             
+            if self.blacklist is not None:
+                blacklist_coords = np.array(self.getBlacklist(chromosome = chromosome)[["start", "end"]])
+                
+                if len(blacklist_coords) > 0:
+                    # Mask blacklisted regions
+                    for start, end in blacklist_coords:
+                        signal[start:end] = 0
+
         elif signal_type == "signal_transformed":
             # Open smoothed signal
             chrom_signal_dir = os.path.join(self.output_directories["smooth_signal"], chromosome)
@@ -4080,14 +4146,14 @@ class ZoneNorm(ChromAnalysisExtended):
 
         if len(signal_idxs) == 0:
             if self.verbose > 0:
-                print(f"No signal zones found for {chromosome} {custom_sample_name} as nothing "
-                      f"exceeded the threshold of {np.round(zone_threshold, 3)}")
+                print(f"Warning: No zones found for {chromosome} {custom_sample_name} as no signal "
+                      f"exceeded the zone threshold of {np.round(zone_threshold, 3)}")
 
             # Set empty placeholders
             unpadded_signal_zones = np.empty((0,2), dtype = np.uint32)
 
             if pad_zones:
-                padded_signal_zones = np.empty((0,2), dtype = np.uint32)
+                padded_signal_zones = {ext: np.empty((0,2), dtype = np.uint32) for ext in extend_depth}
 
         else:
             # Find sequential indexes of signal and keep the start and end as coordinates
@@ -4173,26 +4239,29 @@ class ZoneNorm(ChromAnalysisExtended):
 
                     if pad_zones:
                         for ext in extend_depth:
+                            pad_start = start
+                            pad_end = end
+
                             if round_to_bins:
                                 # Add padding and round start down to the nearest bin / round end up to 
                                 # the nearest bin
-                                start = int(max(0, np.floor((start - extend_depth) / 
-                                                            self.pad_bin_size)) * self.pad_bin_size)
-                                end = int(min(chrom_size, (np.ceil((end + extend_depth) / 
-                                                           self.pad_bin_size)) * self.pad_bin_size))
+                                pad_start = int(max(0, np.floor((pad_start - ext) / 
+                                                                self.pad_bin_size)) * self.pad_bin_size)
+                                pad_end = int(min(chrom_size, (np.ceil((pad_end + ext) / 
+                                                               self.pad_bin_size)) * self.pad_bin_size))
 
                             else:
                                 # Only add padding
-                                start = max(0, start - extend_depth)
-                                end = min(chrom_size, end + extend_depth)
+                                pad_start = max(0, pad_start - ext)
+                                pad_end = min(chrom_size, pad_end + ext)
 
                             # Record the zone after padding
                             if len(padded_signal_zones[ext]) == 0:
-                                padded_signal_zones[ext].append([start, end])
-                            elif start <= (padded_signal_zones[ext][-1][1] + merge_depth):
-                                padded_signal_zones[ext][-1][1] = end
-                            elif end != padded_signal_zones[ext][-1][1]:
-                                padded_signal_zones[ext].append([start, end])
+                                padded_signal_zones[ext].append([pad_start, pad_end])
+                            elif pad_start <= (padded_signal_zones[ext][-1][1] + merge_depth):
+                                padded_signal_zones[ext][-1][1] = pad_end
+                            elif pad_end != padded_signal_zones[ext][-1][1]:
+                                padded_signal_zones[ext].append([pad_start, pad_end])
 
             # Convert to numpy array
             unpadded_signal_zones = np.array(unpadded_signal_zones, dtype = np.uint32).reshape(-1, 2)
@@ -4266,18 +4335,18 @@ class ZoneNorm(ChromAnalysisExtended):
             chromosome:         Chromosome to merge zones for (required if opening zones from file).
             chrom_zones:        Optionally provide array of pairs of start and end coordinates of zones 
                                 for the chromosome. Otherwise zones are opened from file.
-            sample_ids:         Array of sample indexes to merge regions for (use all samples by 
-                                default).
+            sample_ids:         If no custom coordinates given, set as an array of sample indexes to 
+                                merge zones for (use all samples by default).
             padded_zones:       Set as True to open padded zones, or False for unpadded zones.
             extend_depth:       Number of base-pairs of padding for padded zones.
             merged_zones_file:  If a file name is given, merged zones are saved to file. Otherwise the 
                                 array of zones is returned.
             verbose:            Set at a value exceeding 0 to print progress/error messages.
-        """
 
-        if len(sample_ids) == 0:
-            # Use all samples
-            sample_ids = self.sample_ids
+        returns:
+            merged_zones: If no output file was given, return 2D array of merged zone coordinates. 
+                          Otherwise, save to file and return nothing.
+        """
 
         # Check if coordinates provided
         if len(chrom_zones) > 0:
@@ -4288,6 +4357,10 @@ class ZoneNorm(ChromAnalysisExtended):
             if chromosome == "":
                 raise ValueError(f"Chromosome must be specified to read "
                                  f"{'padded' if padded_zones else 'unpadded'} zones from file")
+
+            if len(sample_ids) == 0:
+                # Use all samples
+                sample_ids = self.sample_ids
 
             if padded_zones:
                 if extend_depth is None:
@@ -4324,7 +4397,8 @@ class ZoneNorm(ChromAnalysisExtended):
 
         if len(chrom_zones) > 0:
             # Combine regions and sort by start position
-            chrom_zones = np.unique(np.sort(np.vstack(chrom_zones), axis = 0), axis = 0)
+            chrom_zones = np.vstack(chrom_zones)
+            chrom_zones = chrom_zones[np.lexsort((chrom_zones[:, 1], chrom_zones[:, 0]))]
 
             if verbose > 0:
                 if custom_coords:
@@ -4417,8 +4491,8 @@ class ZoneNorm(ChromAnalysisExtended):
                                that fitted the distribution with the lowest Kolmogorov-Smirnov test statistic 
                                are used.
             extend_depth:      Number of base pairs to add either end of each predicted zone. Set this as zero
-                               to add no padding, or leave unset and it will be derived as 
-                               extend depth = (number of bins to extend by) * (padding bin size).
+                               to add no padding, an integer for custom padding, or leave unset and to derive
+                               it as extend depth = (number of bins to extend by) * (padding bin size).
             merge_depth:       Minimum distance between two zones for them to be combined into one.
             round_to_bins:     Whether to round signal zone coordinates to the nearest full sized padded bins.
             replace_existing:  Whether to overwrite previously created files.
@@ -4447,7 +4521,7 @@ class ZoneNorm(ChromAnalysisExtended):
                     # Create version of zones with another bin size
                     extend_depth.append(self.extend_n_bins * self.bin_size)
 
-        elif isinstance(int, extend_depth):
+        elif isinstance(extend_depth. int):
             if extend_depth > 0:
                 # Add custom extension
                 extend_depth = [extend_depth]
@@ -4576,8 +4650,8 @@ class ZoneNorm(ChromAnalysisExtended):
                         print(f"Cannot find statistics for {custom_sample_names[bw_idx]}")
                         raise e
                 else:
-                    raise ValueError(f"Statistics file does not exist for {custom_sample_names[bw_idx]} "
-                                     f"{chrom}")
+                    raise FileNotFoundError(f"Statistics file does not exist for {custom_sample_names[bw_idx]} "
+                                            f"{chrom}")
 
         if len(process_chrom_bws) > 0:
             if self.verbose > 0:
@@ -4594,6 +4668,8 @@ class ZoneNorm(ChromAnalysisExtended):
                 for chrom in process_chroms:
                     # Calculate chromosome quality filter threshold per sample
                     quality_thresholds[chrom] = self.calculateQualityThresholds(chrom)
+            else:
+                quality_threshold = None
 
             if self.kernel is None:
                 # Smoothing was not applied
@@ -4610,6 +4686,9 @@ class ZoneNorm(ChromAnalysisExtended):
                     for chrom, bw_idx in process_chrom_bws:
                         sample_name = custom_sample_names[bw_idx]
 
+                        if self.quality_filter:
+                            quality_threshold = quality_thresholds[chrom][sample_name]
+
                         zone_processes.append(executor.submit(self.signalToZones,
                                                               bw_idx = bw_idx,
                                                               chromosome = chrom,
@@ -4620,7 +4699,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                                               extend_depth = extend_depth,
                                                               merge_depth = merge_depth,
                                                               min_region_bps = self.min_region_bps,
-                                                              quality_threshold = quality_thresholds[chrom][sample_name],
+                                                              quality_threshold = quality_threshold,
                                                               min_different_bps = self.min_different_bps,
                                                               round_to_bins = round_to_bins))
                             
@@ -4660,14 +4739,23 @@ class ZoneNorm(ChromAnalysisExtended):
                         gc.collect()
                         stats_processes = []
 
-                        for chrom, bw_idx in process_chrom_bws:
-                            # Open merged zone coordinates
-                            merged_zones = self.getMergedZones(chromosome = chrom,
-                                                               get_padded = False,
-                                                               return_df = False)
+                        if self.verbose > 0:
+                            print("Calculating zone statistics for merged unpadded zones")
 
-                            if len(merged_zones) > 0:
-                                merged_zones = merged_zones["unpadded"]
+                        merged_zones = {}
+
+                        for chrom in process_chroms:
+                            # Open unpadded merged zone coordinates
+                            merged_zones[chrom] = self.getMergedZones(chromosome = chrom,
+                                                                      get_padded = False,
+                                                                      return_df = False)
+
+                        for chrom, bw_idx in process_chrom_bws:
+                            # Get merged zone coordinates
+                            zones = merged_zones[chrom]
+
+                            if len(zones) > 0:
+                                zones = zones["unpadded"]
                             else:
                                 raise ValueError(f"Missing merged zones for {chrom}")
                             
@@ -4676,7 +4764,7 @@ class ZoneNorm(ChromAnalysisExtended):
                                                                    chromosome = chrom,
                                                                    use_padded = False,
                                                                    use_merged = True,
-                                                                   zones = merged_zones,
+                                                                   zones = zones,
                                                                    exclude_zero = self.exclude_zero,
                                                                    zone_remove_percent = self.zone_remove_percent))
 
@@ -4688,20 +4776,27 @@ class ZoneNorm(ChromAnalysisExtended):
                             gc.collect()
                             stats_processes = []
 
+                            if self.verbose > 0:
+                                print("Calculating zone statistics for merged padded zones")
+
                             # Separate loop to prevent signal stats files being accessed simultaneously for the same sample
-                            for chrom, bw_idx in process_chrom_bws:
-                                for ext in extend_depth:
-                                    merged_zones = self.getMergedZones(chromosome = chrom,
-                                                                       get_unpadded = False,
-                                                                       extend_depth = ext,
-                                                                       return_df = False)
-                                    merged_zones = merged_zones[f"padded_{ext}"]
+                            for ext in extend_depth:
+                                merged_zones = {}
+
+                                for chrom in process_chroms:
+                                    # Open padded merged zone coordinates
+                                    merged_zones[chrom] = self.getMergedZones(chromosome = chrom,
+                                                                              get_unpadded = False,
+                                                                              extend_depth = ext,
+                                                                              return_df = False)[f"padded_{ext}"]
+                                    
+                                for chrom, bw_idx in process_chrom_bws:
                                     stats_processes.append(executor.submit(self.calculateZoneStats,
                                                                            bw_idx = bw_idx,
                                                                            chromosome = chrom,
                                                                            use_padded = True,
                                                                            use_merged = True,
-                                                                           zones = merged_zones,
+                                                                           zones = merged_zones[chrom],
                                                                            exclude_zero = self.exclude_zero,
                                                                            zone_remove_percent = self.zone_remove_percent,
                                                                            extend_depth = ext))
@@ -4711,9 +4806,12 @@ class ZoneNorm(ChromAnalysisExtended):
 
             else:
                 # Run sequentially rather than using parallelisation
-                sample_name = custom_sample_names[bw_idx]
-
                 for chrom, bw_idx in process_chrom_bws:
+                    sample_name = custom_sample_names[bw_idx]
+
+                    if self.quality_filter:
+                        quality_threshold = quality_thresholds[chrom][sample_name]
+
                     self.signalToZones(bw_idx = bw_idx,
                                        chromosome = chrom,
                                        dist_name = zone_distribution,
@@ -4723,10 +4821,13 @@ class ZoneNorm(ChromAnalysisExtended):
                                        extend_depth = extend_depth,
                                        merge_depth = merge_depth,
                                        min_region_bps = self.min_region_bps,
-                                       quality_threshold = quality_thresholds[chrom][sample_name],
+                                       quality_threshold = quality_threshold,
                                        round_to_bins = round_to_bins)
 
                 if create_merged:
+                    if self.verbose > 0:
+                        print("Calculating zone statistics for merged zones")
+
                     for chrom in process_chroms:
                         unpadded_merged_file = os.path.join(self.output_directories["signal_zones"], 
                                                             chrom,
@@ -4746,14 +4847,20 @@ class ZoneNorm(ChromAnalysisExtended):
                                                        merged_zones_file = padded_merged_file,
                                                        verbose = self.verbose)
 
-                    for chrom, bw_idx in process_chrom_bws:
-                        # Open merged zone coordinates
-                        merged_zones = self.getMergedZones(chromosome = chrom,
-                                                           get_padded = False,
-                                                           return_df = False)
+                    merged_zones = {}
 
-                        if len(merged_zones) > 0:
-                            merged_zones = merged_zones["unpadded"]
+                    for chrom in process_chroms:
+                        # Open unpadded merged zone coordinates
+                        merged_zones[chrom] = self.getMergedZones(chromosome = chrom,
+                                                                  get_padded = False,
+                                                                  return_df = False)
+
+                    for chrom, bw_idx in process_chrom_bws:
+                        # Get merged zone coordinates
+                        zones = merged_zones[chrom]
+
+                        if len(zones) > 0:
+                            zones = zones["unpadded"]
                         else:
                             raise ValueError(f"Missing merged zones for {chrom}")
 
@@ -4761,31 +4868,40 @@ class ZoneNorm(ChromAnalysisExtended):
                                                 chromosome = chrom,
                                                 use_padded = False,
                                                 use_merged = True,
-                                                zones = merged_zones,
+                                                zones = zones,
                                                 exclude_zero = self.exclude_zero,
                                                 zone_remove_percent = self.zone_remove_percent)
 
-                        if pad_zones:
-                            for ext in extend_depth:
-                                merged_zones = self.getMergedZones(chromosome = chrom,
-                                                                   get_unpadded = False,
-                                                                   extend_depth = ext,
-                                                                   return_df = False)
-                                merged_zones = merged_zones[f"padded_{ext}"]
+                    if pad_zones:
+                        for ext in extend_depth:
+                            merged_zones = {}
+
+                            for chrom in process_chroms:
+                                # Open padded merged zone coordinates
+                                merged_zones[chrom] = self.getMergedZones(chromosome = chrom,
+                                                                          get_unpadded = False,
+                                                                          return_df = False)[f"padded_{ext}"]
+
+                            for chrom, bw_idx in process_chrom_bws:
                                 self.calculateZoneStats(bw_idx = bw_idx,
                                                         chromosome = chrom,
                                                         use_padded = True,
                                                         use_merged = True,
-                                                        zones = merged_zones,
+                                                        zones = merged_zones[chrom],
                                                         exclude_zero = self.exclude_zero,
                                                         zone_remove_percent = self.zone_remove_percent,
                                                         extend_depth = ext)
 
         elif self.verbose > 0:
-            if create_merged:
-                print(f"Signal and merged zone files already created for chromosomes")
+            if len(chromosomes) == 1:
+                chromosomes_name = chromosomes[0]
             else:
-                print(f"Signal zone files already created for chromosomes")
+                chromosomes_name = "chromosomes"
+
+            if create_merged:
+                print(f"Signal and merged zone files already created for {chromosomes_name}")
+            else:
+                print(f"Signal zone files already created for {chromosomes_name}")
 
     def removePercentile(self, signal, remove_percent, exclude_zero = False, remove_upper = True, 
                          remove_lower = True, copy_signal = True):
@@ -4871,7 +4987,9 @@ class ZoneNorm(ChromAnalysisExtended):
             if use_padded:
                 message += f"padded {extend_depth}bp "
             else:
-                message += f"unpadded {chromosome} ({bw_idx + 1}/{n_samples})"
+                message += f"unpadded "
+
+            message += f"zones for {custom_sample_name} {chromosome} ({bw_idx + 1}/{n_samples})"
 
             print(message)
 
@@ -4908,31 +5026,20 @@ class ZoneNorm(ChromAnalysisExtended):
                              signal_type = signal_type,
                              file_name = signal_stats_file)
 
-    def createZoneBED(self, zone_type = "padded", create_bigbed = False, chrom_sizes_file = None, 
-                      name_postfix = "", desc_postfix = "", file_postfix = ""):
+    def checkZoneType(self, zone_type):
         """
-        Save zones to BED file for visualisation in a genome browser.
+        Check if a given zone type corresponds to either unpadded or padded zones.
 
         params:
-            zone_type:        Set as either "unpadded", "padded" or "padded_[int]", e.g. "padded_1000".
-            create_bigbed:    Set as True to also save a bigBed file.
-            chrom_sizes_file: Path to file of tab separated chromosomes and sizes for creating bigBed.
-            name_postfix:     Postfix text to add to end of name in BED header.
-            desc_postfix:     Postfix text to add to end of description in BED header.
-            file_postfix:     Postfix text to add to end of BED file name.
+            zone_type: Value to check.
         """
 
-        chrom_col, start_col, end_col = self.region_coords_cols
-        sample_names = np.array(self.getSampleNames(return_custom = True))
-        zone_type = str(zone_type).lower()
-
         pad_bins_match = True
+        error_zone_types = []
 
         if hasattr(self, "bin_size"):
             if self.pad_bin_size != self.bin_size:
                 pad_bins_match = False
-
-        error_zone_types = []
 
         if zone_type != "unpadded":
             if zone_type.startswith("padded"):
@@ -4968,6 +5075,28 @@ class ZoneNorm(ChromAnalysisExtended):
         if error_zone_types:
             allow_zone_types = ", ".join(f'"{z}"' for z in error_zone_types)
             raise ValueError(f"zone_type must be one of: {allow_zone_types}")
+
+        return zone_type
+
+    def createZoneBED(self, zone_type = "padded", create_bigbed = False, chrom_sizes_file = None, 
+                      name_postfix = "", desc_postfix = "", file_postfix = ""):
+        """
+        Save zones to BED file for visualisation in a genome browser.
+
+        params:
+            zone_type:        Set as either "unpadded", "padded" or "padded_[int]", e.g. "padded_1000".
+            create_bigbed:    Set as True to also save a bigBed file.
+            chrom_sizes_file: Path to file of tab separated chromosomes and sizes for creating bigBed.
+            name_postfix:     Postfix text to add to end of name in BED header.
+            desc_postfix:     Postfix text to add to end of description in BED header.
+            file_postfix:     Postfix text to add to end of BED file name.
+        """
+
+        chrom_col, start_col, end_col = self.region_coords_cols
+        sample_names = np.array(self.getSampleNames(return_custom = True))
+
+        zone_type = str(zone_type).lower()
+        zone_type = self.checkZoneType(zone_type)
 
         if create_bigbed:
             if chrom_sizes_file is None:
@@ -5109,6 +5238,14 @@ class ZoneNorm(ChromAnalysisExtended):
                                    end_idx = -1,
                                    chromosome = chromosome,
                                    verbose = 0)
+
+        if self.mask_blacklisted and (self.blacklist is not None):
+            blacklist_coords = np.array(self.getBlacklist(chromosome = chromosome)[["start", "end"]])
+                
+            if len(blacklist_coords) > 0:
+                # Mask blacklisted regions
+                for start, end in blacklist_coords:
+                    signal[start:end] = 0
 
         if self.norm_method == "Scalar":
             if isinstance(self.scaling_factors, float):
@@ -5554,6 +5691,18 @@ class ZoneNorm(ChromAnalysisExtended):
                                            pad_end = True,
                                            verbose = 0)
 
+                if self.blacklist is not None:
+                    blacklist_coords = np.array(self.getBlacklist(chromosome = chromosome)[["start", "end"]])
+                    
+                    if len(blacklist_coords) > 0:
+                        # Remove blacklisted regions
+                        keep_mask = np.ones(len(signal), dtype = bool)
+
+                        for start, end in blacklist_coords:
+                            keep_mask[start:end] = False
+
+                        signal = signal[keep_mask]
+
                 # Attempt to recreate the signal statistics for the original signal
                 signal_stats = self.calculateAverages(signal = signal)
                 self.saveSignalStats(bw_idx, chromosome, signal_stats, signal_type, file_name)
@@ -5780,11 +5929,11 @@ class ZoneNorm(ChromAnalysisExtended):
 
         if len(combined_stats) == 0:
             if stats_type == "signal":
-                raise ValueError(f"Could not find signal statistics for any chromosome.\n"
-                                 f"These can be created with convolveSignals.")
+                raise FileNotFoundError(f"Could not find signal statistics for any chromosome.\n"
+                                        f"These can be created with convolveSignals.")
             else:
-                raise ValueError(f"Could not find distribution statistics for any chromosome.\n"
-                                 f"To produce distribution statistics, run testDistributions.")
+                raise FileNotFoundError(f"Could not find distribution statistics for any chromosome.\n"
+                                        f"To produce distribution statistics, run testDistributions.")
 
         # Combine list of dataframes
         combined_stats_df = pd.concat(combined_stats)
@@ -5824,14 +5973,32 @@ class ZoneNorm(ChromAnalysisExtended):
 
         return chrom_signal
 
-    def saveMergedBigWig(self, samples, file_name):
+    def saveMergedBigWig(self, samples, file_name, replace_existing = False):
         """
         Add signal across bigWigs and save to a new bigWig.
 
         params:
-            samples:   List of samples to combine.
-            file_name: Name of output bigWig file.
+            samples:          List of samples to combine.
+            file_name:        Name of output bigWig file.
+            replace_existing: Whether to overwrite previously created files.
         """
+
+        file_path = os.path.join(self.output_directories["merged_bigwig"], file_name)
+
+        if os.path.exists(file_path):
+            if replace_existing:
+                # Delete pre-existing bigWig
+                os.remove(file_path)
+
+            elif os.path.getsize(file_path) == 0:
+                # Delete empty bigWig
+                os.remove(file_path)
+
+            else:
+                if self.verbose > 0:
+                    print(f'Merged bigWig "{file_name}" already exists')
+
+                return None
 
         # Get sample IDs from sample names
         sample_ids = [self.sampleToIndex(s) for s in samples]
@@ -5873,12 +6040,14 @@ class ZoneNorm(ChromAnalysisExtended):
                         directory = self.output_directories["merged_bigwig"],
                         signals = signals)
 
-    def createmergedBigWigs(self, samples, file_name = ""):
+    def createmergedBigWigs(self, samples, file_name = "", replace_existing = False):
         """
         Combine two or more bigWigs into a single bigWig through addition of signal.
 
         params:
-            samples: List of samples to combine.
+            samples:          List of samples to combine or name of a sample group.
+            file_name:        Name of bigWig to save output to.
+            replace_existing: Whether to overwrite previously created files.
         """
 
         if isinstance(samples, (list, np.ndarray)):
@@ -5908,19 +6077,60 @@ class ZoneNorm(ChromAnalysisExtended):
             error_message = "Merging bigWigs requires two or more samples, "
 
             if n_samples == 0:
-                error_message += " but none were given"
+                error_message += "but none were given"
             else:
-                error_message += " but only one was given"
+                error_message += "but only one was given"
 
             raise ValueError(error_message)
-        
-        if not file_name:
-            file_name = "merged"
-        if not (file_name.endswith(".bw") or file_name.endswith(".bigWig")):
-            file_name += ".bw"
 
-        self.saveMergedBigWig(samples = samples, 
-                              file_name = file_name)
+        # Classify samples by their signal as positive or negative
+        sign_samples = self.getSampleSigns(samples)
+        merge_signs = []
+
+        for sign in sign_samples:
+            if len(sign_samples[sign]) >= 2:
+                merge_signs.append(sign)
+
+        if not merge_signs:
+            raise ValueError("Merging bigWigs requires two or more samples with the same sign (+ or -)")
+        
+        if len(merge_signs) == 2:
+            split_signs = True
+        else:
+            split_signs = False
+
+            if self.verbose > 0:
+                print("All samples have the same sign")
+
+        for sign in merge_signs:
+            if self.verbose > 0:
+                message = f"Creating merged bigWig from {len(sign_samples[sign])} "
+
+                if sign == "Pos":
+                    message += " + sign samples"
+                else:
+                    message += " - sign samples"
+
+                print(message)
+
+            sign_file_name = file_name
+
+            if split_signs:
+                # Set unique file names for postive and negative signal
+                if sign_file_name.endswith(".bw"):
+                    sign_file_name = f"{sign_file_name.replace('.bw', '')}_{sign}.bw"
+                elif sign_file_name.endswith(".bigWig"):
+                    sign_file_name = f"{sign_file_name.replace('.bigWig', '')}_{sign}.bigWig"
+                else:
+                    sign_file_name = f"{sign_file_name}_{sign}.bw"
+
+            elif not (sign_file_name.endswith(".bw") or sign_file_name.endswith(".bigWig")):
+                # Use set file name
+                sign_file_name += ".bw"
+
+            self.saveMergedBigWig(samples = sign_samples[sign],
+                                  file_name = sign_file_name,
+                                  replace_existing = replace_existing)
 
     def saveBinnedBigWig(self, bw_idx, file_name, directory, bin_width):
         """
@@ -6259,9 +6469,8 @@ class ZoneNorm(ChromAnalysisExtended):
             missing_distributions = np.setdiff1d(plot_distributions, all_distributions)
 
             if len(missing_distributions) > 0:
-                raise ValueError(f"Cannot plot distributions the following distributions as no "
-                                 f"statistics were calculated for them: "
-                                 f"{', '.join(missing_distributions)}")
+                raise ValueError(f"Cannot plot the following distributions as no statistics were "
+                                 f"calculated for them: {', '.join(missing_distributions)}")
 
             if len(plot_distributions) < len(all_distributions):
                 # Subset specific distributions
@@ -6275,6 +6484,19 @@ class ZoneNorm(ChromAnalysisExtended):
                                            chromosome = chromosome,
                                            pad_end = True,
                                            verbose = 0)
+
+                if self.blacklist is not None:
+                    blacklist_coords = np.array(self.getBlacklist(chromosome = chromosome)[["start", "end"]])
+                    
+                    if len(blacklist_coords) > 0:
+                        # Remove blacklisted regions
+                        keep_mask = np.ones(len(signal), dtype = bool)
+
+                        for start, end in blacklist_coords:
+                            keep_mask[start:end] = False
+
+                        signal = signal[keep_mask]
+
             else:
                 # Read signal from array if not directly given
                 chrom_signal_dir = os.path.join(self.output_directories["smooth_signal"], chromosome)

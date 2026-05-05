@@ -262,7 +262,7 @@ class ChromAnalysisCore:
         """
 
         if not os.path.exists(directory):
-            raise ValueError(f'Directory does not exist: "{directory}"')
+            raise FileNotFoundError(f'Directory does not exist: "{directory}"')
         elif len(os.listdir(directory)) == 0:
             raise FileNotFoundError(f'Directory is empty: "{directory}"')
 
@@ -280,7 +280,16 @@ class ChromAnalysisCore:
                            belonging to each group.
         """
 
-        samples = np.array(samples)
+        if isinstance(samples, np.ndarray):
+            if samples.ndim > 1:
+                samples = np.concatenate(samples)
+        elif isinstance(samples, list):
+            samples = np.array(samples)
+        else:
+            try:
+                samples = np.array(list(samples))
+            except:
+                raise ValueError("samples must be given as a list or an array")
 
         # Create all paired combinations
         unfiltered_pairs = np.array(np.meshgrid(samples, samples)).T.reshape(-1, 2)
@@ -291,10 +300,10 @@ class ChromAnalysisCore:
             sample_pairs = np.array(unfiltered_pairs)
 
         else:
-            # Keep pairs from different groups
+            # Keep pairs of samples from different groups
             filtered_pairs = []
-            
             group_per_sample = {}
+
             for group, values in sample_groups.items():
                 for s in values:
                     group_per_sample[s] = group
@@ -831,9 +840,14 @@ class ChromAnalysisExtended(ChromAnalysisCore):
             bigwig_files = np.concatenate((self.bigwig_paths[np.char.endswith(self.bigwig_paths, ".bw")],
                                            self.bigwig_paths[np.char.endswith(self.bigwig_paths, ".bigWig")]))
             
-            if (len(wig_files) + len(bigwig_files)) != len(self.bigwig_paths):
+            # Check for invalid file types
+            valid_files = np.concatenate((wig_files, bigwig_files))
+            invalid_files = np.setdiff1d(self.bigwig_paths, valid_files)
+
+            if len(invalid_files) > 0:
+                invalid_files = [f'"{f}"' for f in invalid_files]
                 raise ValueError(f"bigwig_paths contains files that are neither wig nor bigWig: "
-                                 f'"{", ".join(self.bigwig_paths)}"')
+                                 f'{", ".join(invalid_files)}')
 
             # Derive sample names from wig and bigWig files
             full_sample_names = []
@@ -953,6 +967,33 @@ class ChromAnalysisExtended(ChromAnalysisCore):
         else:
             # File derived names
             return list(self.sample_names.keys())
+
+    def getSampleSigns(self, samples = []):
+        """
+        Classify samples by their signal as positive or negative.
+
+        params:
+            samples: List of sample names.
+        """
+
+        if len(samples) == 0:
+            samples = self.getSampleNames(return_custom = False)
+
+        # Classify samples by their signal as positive or negative
+        sign_samples = {"Pos": [], "Neg": []}
+
+        for sample in samples:
+            sample_id = self.sampleToIndex(sample)
+
+            if self.mean_genome_signals[sample_id] >= 0:
+                sign_samples["Pos"].append(sample)
+            else:
+                sign_samples["Neg"].append(sample)
+
+        sign_samples["Pos"] = np.array(sign_samples["Pos"])
+        sign_samples["Neg"] = np.array(sign_samples["Neg"])
+
+        return sign_samples
 
     @staticmethod
     def findBamChroms(bam_file):
@@ -1585,7 +1626,7 @@ class ChromAnalysisExtended(ChromAnalysisCore):
         return range_regions
 
     def plotTracks(self, chromosome, start_coord, end_coord, signals = {}, 
-                   bar_regions = [], bar_labels = [], y_intercept = None, y_intercept_labels = "", 
+                   bar_regions = [], bar_labels = None, y_intercept = None, y_intercept_labels = "", 
                    overlay_plots = False, plot_samples = [], plot_bigwigs = [], plot_labels = [],
                    main_title = "", legend_title = None, custom_colours = [], y_intercept_colour = None, 
                    bar_colour = "darkgrey", same_y_axis = True, share_y_intercepts = True, custom_y = [], 
@@ -1686,7 +1727,7 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                     if not (file.endswith(".bw") or file.endswith(".bigWig")):
                         raise ValueError(f'"{file}" is not a bigWig')
                     elif not os.path.exists(file):
-                        raise ValueError(f'bigWig "{file}" does not exist')
+                        raise FileNotFoundError(f'bigWig "{file}" does not exist')
                     else:
                         # Get sample name from file path
                         name = file.split(os.sep)[-1].replace(".bw", "").replace(".bigwig", "")
@@ -1726,7 +1767,7 @@ class ChromAnalysisExtended(ChromAnalysisCore):
 
                 if len(missing_samples) > 0:
                     raise ValueError(f"Unknown sample name{'s' if len(missing_samples) != 1 else ''}: "
-                                    f"{', '.join(chr(34) + s + chr(34) for s in missing_samples)}")
+                                     f"{', '.join(chr(34) + s + chr(34) for s in missing_samples)}")
 
                 if len(plot_labels) != len(plot_signals):
                     if custom_sample_names:
@@ -1777,7 +1818,9 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                 if (not same_y_axis) or (len(bar_regions) != n_samples):
                     raise ValueError("Number of bar regions and number of samples to plot does not match")
                 
-            if isinstance(bar_labels, str):
+            if bar_labels is None:
+                bar_labels = [f"Regions {i}" for i in range(1, n_bar_regions + 1)]
+            elif isinstance(bar_labels, str):
                 bar_labels = [bar_labels]
             elif isinstance(bar_labels, (list, np.ndarray)):
                 bar_labels = list(bar_labels)
@@ -2166,3 +2209,4 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                         format = "pdf", bbox_inches = "tight")
 
         plt.show()
+        
