@@ -1,15 +1,28 @@
+05/05/2026 TomMakesThings
+	Version 1.0.1
+	* Major bug fixes in predictSignalZones to prevent error when no zones found for 
+	  a chromosome and selecting zone threshold with one core
+	* Minor bug fix in mergeOverlapZones for extending zone coordinates in case with 
+	  multiple extension sizes 
+	* Updated bigWig merging function to separate positive and negative signal
+	* Prevent samtools error if not installed, but spike-in not set
+	* Blacklisted regions now can be hidden in ZEN normalised bigWigs
+
 31/03/2026 TomMakesThings
 	Version 1.0.0
 	* Minor bug fixes
-	* Major bux fixes for running predictSignalZones with one core and saving signal statistics per chromosome
+	* Major bux fixes for running predictSignalZones with one core and saving signal 
+	  statistics per chromosome
 	* Gzip compression of temporary CSVs and support for XZ compression
 	* New function for creating binned bigWigs from input bigWigs
 	* New function to download publically hosted BAMs, bigWigs and BED files via FTP
-	* Split ZoneNorm attribute norm_stats_type into zen_from_zones, zen_padded_zones and zen_sample_zones
+	* Split ZoneNorm attribute norm_stats_type into zen_from_zones, zen_padded_zones 
+	  and zen_sample_zones
 	* Added support for rescaling bigWigs by custom sample-specific scaling factors
 	* Updated labels for fitting distribution histograms
 	* Added more significance test options for Wasserstein distribution plots
-	* Independent t-test removed from Wasserstein distribution plots and default set as linear mixed model
+	* Independent t-test removed from Wasserstein distribution plots and default set 
+	  as linear mixed model
 
 08/11/2025 TomMakesThings
 	Version 0.0.1
