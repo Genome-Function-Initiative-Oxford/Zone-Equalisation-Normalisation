@@ -4036,6 +4036,47 @@ class ZoneNorm(ChromAnalysisExtended):
                       merge_depth = 0, min_region_bps = 35, quality_threshold = None, min_different_bps = 5,
                       round_to_bins = True):
         """
+        For each sample, set a chromosome quality filter threshold based on:
+        1) A scaled average signal across the genome
+        2) A scaled average signal across the chromosome
+        3) Signal equivalent to more than 10 overlapping fragments being detected
+
+        params:
+            chromosome:   Name of chromosome to calculate the quality filters for.
+            sample_names: List of sample names. If not set, all samples are used.
+        """
+
+        if sample_names:
+            sample_ids = [self.sampleToIndex(s) for s in sample_names]
+        else:
+            sample_names = self.getSampleNames(return_custom = True)
+            sample_ids = self.sample_ids
+        
+        chrom_fragments, chrom_means, global_means = self.getChromFragMean(chromosome = chromosome,
+                                                                           sample_ids = sample_ids)
+        
+        quality_thresholds = {}
+        
+        for idx, (sample_id, sample_name) in enumerate(zip(sample_ids, sample_names)):
+            # Check if signal is positive or negative
+            if self.mean_genome_signals[sample_id] >= 0:
+                # Set quality threshold for positive signal
+                quality_thresholds[sample_name] = max(global_means[idx] * 1.5,
+                                                      chrom_means[idx] * 1.5,
+                                                      chrom_fragments[idx] * 10)
+            else:
+                # Set quality threshold for negative signal
+                quality_thresholds[sample_name] = min(global_means[idx] * 1.5,
+                                                      chrom_means[idx] * 1.5,
+                                                      chrom_fragments[idx] * 10)
+
+        return quality_thresholds
+
+    def signalToZones(self, bw_idx, chromosome, dist_name, param_type, 
+                      signal_type = "signal_transformed", zone_probability = None, extend_depth = [0], 
+                      merge_depth = 0, min_region_bps = 35, quality_threshold = None, min_different_bps = 5,
+                      round_to_bins = True):
+        """
         Extract signal zone, i.e. coordinates of regions predicted to contain signal.
 
         params:
@@ -4806,6 +4847,8 @@ class ZoneNorm(ChromAnalysisExtended):
 
             else:
                 # Run sequentially rather than using parallelisation
+                sample_name = custom_sample_names[bw_idx]
+
                 for chrom, bw_idx in process_chrom_bws:
                     sample_name = custom_sample_names[bw_idx]
 
