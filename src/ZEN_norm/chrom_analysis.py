@@ -143,7 +143,7 @@ class ChromAnalysisCore:
             # Create directory to download bigWigs into
             os.makedirs(directory, exist_ok = True)
 
-        file_extensions = (".bam", ".bw", ".bigWig", ".bed")
+        file_extensions = (".bam", ".bw", ".bigWig", ".bed", ".bed.gz")
 
         if n_threads > 1:
             executor = ThreadPoolExecutor(n_threads)
@@ -156,6 +156,12 @@ class ChromAnalysisCore:
         bam_files = []
         bam_names = []
 
+        if isinstance(ftp_paths, str):
+            ftp_paths = [ftp_paths]
+
+        if len(ftp_paths) == 0:
+            raise ValueError("ftp_paths is empty")
+
         for ftp_path in ftp_paths:
             # Get name of file to save contents to
             file = ftp_path.split(os.sep)[-1]
@@ -167,7 +173,7 @@ class ChromAnalysisCore:
             if file.endswith(file_extensions):
                 if file.endswith("bam"):
                     file_type = "BAM"
-                elif file.endswith("bed"):
+                elif file.endswith("bed") or file.endswith("bed.gz"):
                     file_type = "BED"
                 else:
                     file_type = "bigWig"
@@ -2223,3 +2229,4 @@ class ChromAnalysisExtended(ChromAnalysisCore):
                         format = "pdf", bbox_inches = "tight")
 
         plt.show()
+        

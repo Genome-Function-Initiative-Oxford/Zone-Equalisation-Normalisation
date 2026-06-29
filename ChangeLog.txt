@@ -1,6 +1,6 @@
 29/06/2026 TomMakesThings
 	Version 1.0.2
-	* Minor bug fix to prevent missing zone thresholds
+	* Minor bug fix in testZoneCallDistributions to correct placeholders to be for missing signal
 	* Update Wasserstein distance plots to save intermediate results and added rank feature
 
 05/05/2026 TomMakesThings
