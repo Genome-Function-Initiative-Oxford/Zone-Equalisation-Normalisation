@@ -1,3 +1,7 @@
+TBC TomMakesThings
+	Version 1.0.3
+	* Minor bug fix in createPairs to accommodate sample lists of lists of unequal size
+
 29/06/2026 TomMakesThings
 	Version 1.0.2
 	* Minor bug fix in testZoneCallDistributions to correct placeholders to be for missing signal
